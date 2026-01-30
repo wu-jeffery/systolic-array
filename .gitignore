@@ -1,0 +1,75 @@
+
+
+# misc
+*.pdf
+
+# zip files
+*.zip
+*.gz
+*.tgz
+
+# verilog compilation
+*simv
+*.daidir
+*.key
+*.vdb
+*.vcd
+
+vc_hdrs.h
+debug_bin
+csrc/
+urgReport/
+
+cov_report_*/
+
+# ignore the entire build/ folder
+build/
+work/
+q
+synth/cksum_dir
+
+# synthesis files
+*.vg
+*.rep
+*.ddc
+*.chk
+*.log
+*.syn
+*.db
+*.svf
+*.mr
+*.pvl
+*_svsim.sv
+*.pvk
+*.lst
+
+# verdi
+verdi*
+novas*
+*fsdb*
+
+# program memory compilation
+*.elf
+*.mem
+*.dump
+*.dump_*
+
+# per-run output files
+*.out
+*.cpi
+*.wb
+*.ppln
+
+# ignore the output folder
+# don't ignore the correct_out folder
+output/
+!correct_out/*
+debugger/ui/node_modules/
+debugger/ui/build/
+debugger/uidist/
+debugger/ui/.next/
+debugger/debuggingVCDs/
+__pycache__
+
+.DS_Store
+debugger/parser_server/venv/
