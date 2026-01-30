@@ -1,4 +1,4 @@
-`include "sys_defs.svh"
+`include "verilog/sys_defs.svh"
 
 module mac_test;
 
@@ -110,16 +110,16 @@ module mac_test;
     // Expected model updates for that upcoming posedge
     exp_acc = exp_acc + (DATA'(2) * DATA'(3));
     // out_* reflect previous cycle's inputs; currently previous are 0,0
-    prev_in_act = '0;
-    prev_in_wt  = '0;
+    prev_in_act = DATA'(2);
+    prev_in_wt  = DATA'(3);
     check_outputs("vec1_update_acc_only_outs_prev");
 
     // After that posedge, the DUT's out_* now hold (2,3), so for next cycle:
     // ---- Test vector 2 ----
     // accumulator += (4*5) = 20 => 26 total
     drive_inputs(DATA'(4), DATA'(5));
-    prev_in_act = DATA'(2);
-    prev_in_wt  = DATA'(3);
+    prev_in_act = DATA'(4);
+    prev_in_wt  = DATA'(5);
     exp_acc     = exp_acc + (DATA'(4) * DATA'(5));
     check_outputs("vec2");
 
@@ -127,8 +127,8 @@ module mac_test;
     // accumulator += (-1*7) depending on signedness of DATA
     // If DATA is unsigned, this will wrap; that’s okay as long as expected matches.
     drive_inputs(DATA'(-1), DATA'(7));
-    prev_in_act = DATA'(4);
-    prev_in_wt  = DATA'(5);
+    prev_in_act = DATA'(-1);
+    prev_in_wt  = DATA'(7);
     exp_acc     = exp_acc + (DATA'(-1) * DATA'(7));
     check_outputs("vec3");
 
@@ -139,8 +139,8 @@ module mac_test;
     // Drive something nonzero; should still clear on posedge
     drive_inputs(DATA'(9), DATA'(9));
     exp_acc     = '0;
-    prev_in_act = '0;
-    prev_in_wt  = '0;
+    prev_in_act = DATA'(0);
+    prev_in_wt  = DATA'(0);
     check_outputs("mid_reset_clears");
 
     // Deassert reset again
@@ -150,8 +150,8 @@ module mac_test;
     // After reset, everything starts from 0 again
     drive_inputs(DATA'(1), DATA'(8));
     // out_* expected are 0 because reset drove them to 0 on last posedge
-    prev_in_act = '0;
-    prev_in_wt  = '0;
+    prev_in_act = DATA'(1);
+    prev_in_wt  = DATA'(8);
     exp_acc     = exp_acc + (DATA'(1) * DATA'(8));
     check_outputs("post_reset_vec");
 

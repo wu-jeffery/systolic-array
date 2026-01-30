@@ -1,4 +1,4 @@
-`include "sys_defs.svh"
+`include "verilog/sys_defs.svh"
 
 // Systolic Array Multiply Accummulate Unit
 module mac (
@@ -11,11 +11,10 @@ module mac (
     output DATA out_weight,
 
     output DATA accumulator
-
 );
-    DATA accumulator, n_accumulator;
-    DATA out_activation, n_out_activation;
-    DATA out_weight, n_out_weight;
+    DATA n_accumulator;
+    DATA n_out_activation;
+    DATA n_out_weight;
 
     assign n_out_activation = in_activation;
     assign n_out_weight = in_weight;

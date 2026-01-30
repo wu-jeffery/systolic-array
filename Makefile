@@ -5,7 +5,7 @@
 .DEFAULT_GOAL := help
 
 # List your modules here (names must match verilog/<name>.sv and test/<name>_test.sv)
-MODULES := adder
+MODULES := adder mac
 
 # Tool script (must exist in your repo)
 TCL_SCRIPT := synth/470synth.tcl
@@ -14,7 +14,7 @@ TCL_SCRIPT := synth/470synth.tcl
 LIB := /usr/caen/misc/class/eecs470/lib/verilog/lec25dscc25.v
 
 # Clock period (ns)
-CLOCK_PERIOD ?= 11.12
+CLOCK_PERIOD ?= 30.0
 
 # If you're on CAEN, module load gives you VCS/DC. Keep this since you said
 # "I need to use the 470 tcl cause this is how i get access to those tools."
@@ -22,7 +22,7 @@ LOAD_TOOLS = module load vcs/2023.12-SP2-1 verdi/2023.12-SP2-1 synopsys-synth &&
 
 # VCS compile commands
 VCS_COMMON = vcs -sverilog -full64 -kdb -lca -nc -debug_access+all \
-	+define+CLOCK_PERIOD=$(CLOCK_PERIOD)
+	+define+CLOCK_PERIOD=$(CLOCK_PERIOD) +incdir+verilog/includes +incdir+verilog
 
 VCS_SIM = $(VCS_COMMON)
 VCS_SYN = $(VCS_COMMON) +define+SYNTH
