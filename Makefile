@@ -29,11 +29,15 @@ VCS_SYN = $(VCS_COMMON) +define+SYNTH
 
 RUN_VERDI = -gui=verdi -verdi_opts "-ultra"
 
+SIM_RUN_FLAGS ?= +vcs+vcd
+
+VCD_DIR := vcd
+
 # Dirs
 BUILD_DIR := build
 SYN_DIR   := synth
 
-$(BUILD_DIR) $(SYN_DIR):
+$(BUILD_DIR) $(SYN_DIR) $(VCD_DIR):
 	mkdir -p $@
 
 ####################
@@ -65,7 +69,7 @@ $(MODULES:%=$(BUILD_DIR)/%.simv): $(BUILD_DIR)/%.simv: verilog/%.sv test/%_test.
 # Run sim: make <module>
 $(MODULES): %: $(BUILD_DIR)/%.simv
 	@echo "==> [RUN] RTL sim for $*"
-	@cd $(BUILD_DIR) && ./$(notdir $<) | tee $*.out
+	@cd $(BUILD_DIR) && ./$(notdir $<) $(SIM_RUN_FLAGS) +dumpfile=../$(VCD_DIR)/$*.vcd | tee $*.out
 	@echo "==> Output: $(BUILD_DIR)/$*.out"
 
 # Verdi: make <module>.verdi
@@ -107,7 +111,7 @@ $(MODULES:%=$(BUILD_DIR)/%.syn.simv): $(BUILD_DIR)/%.syn.simv: test/%_test.sv $(
 # Run gate sim: make <module>.syn.run
 $(MODULES:%=%.syn.run): %.syn.run: $(BUILD_DIR)/%.syn.simv
 	@echo "==> [RUN] Gate-level sim for $*"
-	@cd $(BUILD_DIR) && ./$(notdir $<) | tee $*.syn.out
+	@cd $(BUILD_DIR) && ./$(notdir $<) $(SIM_RUN_FLAGS) +dumpfile=../$(VCD_DIR)/$*.vcd | tee $*.out
 	@echo "==> Output: $(BUILD_DIR)/$*.syn.out"
 
 .PHONY: $(MODULES:%=%.syn.run)

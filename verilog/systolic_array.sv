@@ -1,5 +1,54 @@
-module systolic_array(
+`include "verilog/sys_defs.svh"
+
+module systolic_array #(
+    parameter int T = 4
+)(
+    input logic clock,
+    input logic reset,
+
+    // Data
+    input DATA [T-1:0] activations,
+    input DATA [T-1:0] weights,
+
+    // Control Signals
+    input logic fetch_result,
     
+    output logic accummulators_valid,
+    output DATA [(T*T)-1: 0] accummulators
 );
+    DATA [T-1:0][T:0] a_wire; // activation wires
+    DATA [T-1:0][T:0] w_wrie; // weight wires
+
+    genvar r, c;
+    generate
+        for (r = 0; r <T; r++) begin : GEN_A_EDGE
+            assign a_wire[r][0] = activations[r];
+        end
+    endgenerate
+
+    // Drive top edge 
+    generate
+        for (c = 0; c <T; c++) begin : GEN_A_EDGE
+            assign w_wire[0][c] = activations[c];
+        end
+    endgenerate
+
+    generate
+      for (r = 0; r < T; r++) begin : GEN_ROWS
+        for (c = 0; c < T; c++) begin : GEN_COLS
+
+          mac u_mac (
+            .clock        (clock),
+            .reset        (reset),
+            .in_activation(a_wire[r][c]),
+            .in_weight    (w_wire[r][c]),
+            .out_activation(a_wire[r][c+1]),
+            .out_weight   (w_wire[r+1][c]),
+            .accumulator  (accumulators[r*T + c])
+          );
+
+        end
+      end
+    endgenerate
 
 endmodule

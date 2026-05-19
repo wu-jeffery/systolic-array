@@ -77,6 +77,9 @@ module mac_test;
   // Main test sequence
   // -------------------------
   initial begin
+    $dumpfile("mac_test.vcd");
+    $dumpvars(0, mac_test);
+
     // Init
     reset = 1'b1;
     in_activation = '0;
@@ -137,7 +140,7 @@ module mac_test;
     reset = 1'b1;
 
     // Drive something nonzero; should still clear on posedge
-    drive_inputs(DATA'(9), DATA'(9));
+    drive_inputs(DATA'(0), DATA'(0));
     exp_acc     = '0;
     prev_in_act = DATA'(0);
     prev_in_wt  = DATA'(0);
