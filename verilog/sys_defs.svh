@@ -4,6 +4,7 @@
 `timescale 1ns/100ps
 
 `define ARRAY_SIZE 4
+`define MULT_PIPELINE_CYCLES 0
 typedef logic [31:0] DATA;
 
 

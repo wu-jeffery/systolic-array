@@ -7,11 +7,15 @@ module tpu_test ();
     logic reset;
     logic load_activations;
     logic load_weights;
+    logic start_compute;
     logic fetch_result;
 
     DATA [T-1:0] activations_in;
     DATA [T-1:0] weights_in;
+    logic busy;
+    logic done;
     logic accumulators_valid;
+    logic [(T*T)-1:0] accumulator_valid;
     DATA [(T*T)-1:0] accumulators;
     DATA expected_top_left;
 
@@ -24,8 +28,12 @@ module tpu_test ();
         .load_weights      (load_weights),
         .activations_in    (activations_in),
         .weights_in        (weights_in),
+        .start_compute     (start_compute),
         .fetch_result      (fetch_result),
+        .busy              (busy),
+        .done              (done),
         .accumulators_valid(accumulators_valid),
+        .accumulator_valid (accumulator_valid),
         .accumulators      (accumulators)
     );
 
@@ -36,6 +44,7 @@ module tpu_test ();
         reset = 1'b1;
         load_activations = 1'b0;
         load_weights = 1'b0;
+        start_compute = 1'b0;
         fetch_result = 1'b0;
         activations_in = '{default: '0};
         weights_in = '{default: '0};
@@ -57,8 +66,10 @@ module tpu_test ();
         @(negedge clock);
         load_activations = 1'b0;
         load_weights = 1'b0;
+        start_compute = 1'b1;
 
         @(negedge clock);
+        start_compute = 1'b0;
         expected_top_left = activations_in[0] * weights_in[0];
         if (accumulators[0] !== expected_top_left) begin
             $display("[FAIL] top-left accumulator=%0d expected=%0d @t=%0t",
@@ -72,6 +83,16 @@ module tpu_test ();
             $display("[FAIL] accumulators_valid did not follow fetch_result @t=%0t", $time);
             $finish;
         end
+        fetch_result = 1'b0;
+
+        repeat (4) @(posedge clock);
+        #1;
+        if (accumulator_valid[0] !== 1'b1 || accumulators_valid !== 1'b1) begin
+            $display("[FAIL] scheduler did not mark accumulator 0 valid @t=%0t", $time);
+            $finish;
+        end
+
+        wait (done);
 
         $display("[PASS] tpu buffer-to-array smoke test");
         $finish;

@@ -1,7 +1,9 @@
 `include "verilog/sys_defs.svh"
 
-// Systolic Array Multiply Accummulate Unit
-module mac (
+// Systolic Array Multiply Accumulate Unit
+module mac #(
+    parameter int MULT_PIPELINE_CYCLES = `MULT_PIPELINE_CYCLES
+)(
     input logic clock,
     input logic reset,
 

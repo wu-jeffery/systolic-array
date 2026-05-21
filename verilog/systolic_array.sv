@@ -1,7 +1,8 @@
 `include "verilog/sys_defs.svh"
 
 module systolic_array #(
-    parameter int T = 4
+    parameter int T = 4,
+    parameter int MULT_PIPELINE_CYCLES = `MULT_PIPELINE_CYCLES
 )(
     input logic clock,
     input logic reset,
@@ -39,7 +40,9 @@ module systolic_array #(
       for (r = 0; r < T; r++) begin : GEN_ROWS
         for (c = 0; c < T; c++) begin : GEN_COLS
 
-          mac u_mac (
+          mac #(
+            .MULT_PIPELINE_CYCLES(MULT_PIPELINE_CYCLES)
+          ) u_mac (
             .clock        (clock),
             .reset        (reset),
             .in_activation(a_wire[r][c]),
