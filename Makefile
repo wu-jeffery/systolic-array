@@ -5,7 +5,9 @@
 .DEFAULT_GOAL := help
 
 # List your modules here (names must match verilog/<name>.sv and test/<name>_test.sv)
-MODULES := adder mac
+MODULES := adder mac systolic_array tpu
+
+COMMON_RTL := verilog/mac.sv verilog/activation_buffer.sv verilog/weight_buffer.sv verilog/systolic_array.sv
 
 # Tool script (must exist in your repo)
 TCL_SCRIPT := synth/470synth.tcl
@@ -62,9 +64,9 @@ help:
 #########################################
 
 # Build sim executable: build/<module>.simv
-$(MODULES:%=$(BUILD_DIR)/%.simv): $(BUILD_DIR)/%.simv: verilog/%.sv test/%_test.sv | $(BUILD_DIR)
+$(MODULES:%=$(BUILD_DIR)/%.simv): $(BUILD_DIR)/%.simv: verilog/%.sv test/%_test.sv $(COMMON_RTL) verilog/sys_defs.svh | $(BUILD_DIR)
 	@echo "==> [VCS] Building RTL sim $@"
-	@$(LOAD_TOOLS) $(VCS_SIM) $^ -o $@
+	@$(LOAD_TOOLS) $(VCS_SIM) $(filter-out verilog/$*.sv,$(COMMON_RTL)) verilog/$*.sv test/$*_test.sv -o $@
 
 # Run sim: make <module>
 $(MODULES): %: $(BUILD_DIR)/%.simv
@@ -84,13 +86,13 @@ $(MODULES:%=%.verdi): %.verdi: $(BUILD_DIR)/%.simv
 #########################################
 
 # DC output: synth/<module>.vg
-$(MODULES:%=$(SYN_DIR)/%.vg): $(SYN_DIR)/%.vg: verilog/%.sv $(TCL_SCRIPT) | $(SYN_DIR)
+$(MODULES:%=$(SYN_DIR)/%.vg): $(SYN_DIR)/%.vg: verilog/%.sv $(COMMON_RTL) verilog/sys_defs.svh $(TCL_SCRIPT) | $(SYN_DIR)
 	@echo "==> [DC] Synthesizing $* -> $@"
 	@cd $(SYN_DIR) && \
 	  $(LOAD_TOOLS) \
 	  MODULE=$* \
 	  CLOCK_PERIOD=$(CLOCK_PERIOD) \
-	  SOURCES="$(abspath verilog/$*.sv)" \
+	  SOURCES="$(abspath $(filter-out verilog/$*.sv,$(COMMON_RTL)) verilog/$*.sv)" \
 	  dc_shell-t -f $(notdir $(TCL_SCRIPT)) | tee $*_synth.out
 
 # Convenience target: make <module>.syn

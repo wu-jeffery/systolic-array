@@ -1,6 +1,8 @@
 `include "verilog/sys_defs.svh"
 
 module systolic_array_test ();
+    localparam int T = `ARRAY_SIZE;
+
     logic clock;
     logic reset;
 
@@ -9,11 +11,11 @@ module systolic_array_test ();
 
     logic fetch_result;
 
-    logic accummulators_valid;
-    DATA [(T*T)-1: 0] accummulators;
+    logic accumulators_valid;
+    DATA [(T*T)-1:0] accumulators;
 
     systolic_array dut #(
-        .T(`ARRAY_SIZE)
+        .T(T)
     )(
         .clock(clock),
         .reset(reset),
@@ -25,8 +27,8 @@ module systolic_array_test ();
         // Control Signals
         .fetch_result(fetch_result),
 
-        .accummulators_valid(accummulators_valid),
-        .accummulators(accummulators)
+        .accumulators_valid(accumulators_valid),
+        .accumulators(accumulators)
     );
 
 endmodule

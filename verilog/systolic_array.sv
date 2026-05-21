@@ -13,25 +13,27 @@ module systolic_array #(
     // Control Signals
     input logic fetch_result,
     
-    output logic accummulators_valid,
-    output DATA [(T*T)-1: 0] accummulators
+    output logic accumulators_valid,
+    output DATA [(T*T)-1:0] accumulators
 );
     DATA [T-1:0][T:0] a_wire; // activation wires
-    DATA [T-1:0][T:0] w_wrie; // weight wires
+    DATA [T:0][T-1:0] w_wire; // weight wires
 
     genvar r, c;
     generate
-        for (r = 0; r <T; r++) begin : GEN_A_EDGE
+        for (r = 0; r < T; r++) begin : GEN_A_EDGE
             assign a_wire[r][0] = activations[r];
         end
     endgenerate
 
-    // Drive top edge 
+    // Drive top edge.
     generate
-        for (c = 0; c <T; c++) begin : GEN_A_EDGE
-            assign w_wire[0][c] = activations[c];
+        for (c = 0; c < T; c++) begin : GEN_W_EDGE
+            assign w_wire[0][c] = weights[c];
         end
     endgenerate
+
+    assign accumulators_valid = fetch_result;
 
     generate
       for (r = 0; r < T; r++) begin : GEN_ROWS
