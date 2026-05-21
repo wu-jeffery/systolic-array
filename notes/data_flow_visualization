@@ -1,0 +1,15 @@
+External RAM / main memory
+        ↓
+On-chip scratchpad / SRAM
+        ↓
+Activation tile buffer     Weight tile buffer
+        ↓                         ↓
+        └──────→ Systolic Array ←──┘
+                       ↓
+              Accumulator / PSUM buffer
+                       ↓
+              Output / activation buffer
+                       ↓
+        On-chip scratchpad / SRAM
+                       ↓
+              External RAM if needed
