@@ -6,6 +6,7 @@ module mac #(
 )(
     input logic clock,
     input logic reset,
+    input logic clear_accumulator,
 
     input DATA in_activation,
     input DATA in_weight,
@@ -23,7 +24,7 @@ module mac #(
     assign n_accumulator = accumulator + (in_activation * in_weight); // TODO This will change if we want to do FP
 
     always_ff @(posedge clock) begin 
-        if(reset) begin 
+        if(reset || clear_accumulator) begin
             accumulator <= '0;
             out_weight <= '0;
             out_activation <= '0;

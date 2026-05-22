@@ -7,7 +7,7 @@
 # List your modules here (names must match verilog/<name>.sv and test/<name>_test.sv)
 MODULES := adder mac systolic_array tpu
 
-COMMON_RTL := verilog/mac.sv verilog/activation_buffer.sv verilog/weight_buffer.sv verilog/tpu_scheduler.sv verilog/systolic_array.sv
+COMMON_RTL := verilog/mac.sv verilog/activation_buffer.sv verilog/weight_buffer.sv verilog/tpu_command_queue.sv verilog/tpu_scheduler.sv verilog/tpu_controller.sv verilog/systolic_array.sv
 
 # Tool script (must exist in your repo)
 TCL_SCRIPT := synth/470synth.tcl

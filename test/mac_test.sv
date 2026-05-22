@@ -4,6 +4,7 @@ module mac_test;
 
   logic clock;
   logic reset;
+  logic clear_accumulator;
 
   DATA in_activation;
   DATA in_weight;
@@ -15,6 +16,7 @@ module mac_test;
   mac dut (
     .clock(clock),
     .reset(reset),
+    .clear_accumulator(clear_accumulator),
     .in_activation(in_activation),
     .in_weight(in_weight),
     .out_activation(out_activation),
@@ -82,6 +84,7 @@ module mac_test;
 
     // Init
     reset = 1'b1;
+    clear_accumulator = 1'b0;
     in_activation = '0;
     in_weight     = '0;
 
@@ -146,10 +149,19 @@ module mac_test;
     prev_in_wt  = DATA'(0);
     check_outputs("mid_reset_clears");
 
-    // Deassert reset again
     @(negedge clock);
     reset = 1'b0;
+    clear_accumulator = 1'b1;
+    drive_inputs(DATA'(9), DATA'(9));
+    exp_acc = '0;
+    prev_in_act = '0;
+    prev_in_wt = '0;
+    check_outputs("explicit_clear");
 
+    @(negedge clock);
+    clear_accumulator = 1'b0;
+
+    // Deassert reset again
     // After reset, everything starts from 0 again
     drive_inputs(DATA'(1), DATA'(8));
     // out_* expected are 0 because reset drove them to 0 on last posedge

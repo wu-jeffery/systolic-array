@@ -5,6 +5,7 @@ module systolic_array_test ();
 
     logic clock;
     logic reset;
+    logic clear_accumulators;
 
     DATA [T-1:0] activations;
     DATA [T-1:0] weights;
@@ -19,6 +20,7 @@ module systolic_array_test ();
     )(
         .clock(clock),
         .reset(reset),
+        .clear_accumulators(clear_accumulators),
 
         // Data
         .activations(activations),

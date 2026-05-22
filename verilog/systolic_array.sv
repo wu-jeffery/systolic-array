@@ -6,6 +6,7 @@ module systolic_array #(
 )(
     input logic clock,
     input logic reset,
+    input logic clear_accumulators,
 
     // Data
     input DATA [T-1:0] activations,
@@ -45,6 +46,7 @@ module systolic_array #(
           ) u_mac (
             .clock        (clock),
             .reset        (reset),
+            .clear_accumulator(clear_accumulators),
             .in_activation(a_wire[r][c]),
             .in_weight    (w_wire[r][c]),
             .out_activation(a_wire[r][c+1]),
