@@ -32,15 +32,6 @@ module tpu_controller #(
     output logic done
 );
 
-    typedef enum logic [2:0] {
-        STATE_IDLE,
-        STATE_CLEAR,
-        STATE_LOAD,
-        STATE_START,
-        STATE_RUN,
-        STATE_ADVANCE
-    } STATE;
-
     STATE state;
     TPU_CMD active_cmd;
     logic [`TILE_COUNT_WIDTH-1:0] current_m_tile;

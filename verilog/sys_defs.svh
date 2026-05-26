@@ -21,6 +21,14 @@ typedef struct packed {
     logic [`TILE_COUNT_WIDTH-1:0] k_tiles;
 } TPU_CMD;
 
+typedef enum logic [2:0] {
+    STATE_IDLE,
+    STATE_CLEAR,
+    STATE_LOAD,
+    STATE_START,
+    STATE_RUN,
+    STATE_ADVANCE
+} STATE;
 
 
 `endif // __SYS_DEFS_SVH__
