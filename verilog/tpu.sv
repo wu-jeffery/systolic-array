@@ -35,6 +35,8 @@ module tpu #(
 
     DATA [T-1:0] buffered_activations;
     DATA [T-1:0] buffered_weights;
+    DATA [T-1:0] skewed_activations;
+    DATA [T-1:0] skewed_weights;
     logic load_activations;
     logic load_weights;
     logic start_compute;
@@ -76,6 +78,28 @@ module tpu #(
         .load       (load_weights),
         .weights_in (weights_in),
         .weights_out(buffered_weights)
+    );
+
+    input_skew_buffer #(
+        .T(T)
+    ) activation_skew (
+        .clock   (clock),
+        .reset   (reset),
+        .clear   (clear_accumulators),
+        .load    (start_compute),
+        .data_in (buffered_activations),
+        .data_out(skewed_activations)
+    );
+
+    input_skew_buffer #(
+        .T(T)
+    ) weight_skew (
+        .clock   (clock),
+        .reset   (reset),
+        .clear   (clear_accumulators),
+        .load    (start_compute),
+        .data_in (buffered_weights),
+        .data_out(skewed_weights)
     );
 
     tpu_scheduler #(
@@ -129,8 +153,8 @@ module tpu #(
         .clock             (clock),
         .reset             (reset),
         .clear_accumulators(clear_accumulators),
-        .activations       (buffered_activations),
-        .weights           (buffered_weights),
+        .activations       (skewed_activations),
+        .weights           (skewed_weights),
         .fetch_result      (fetch_result),
         .accumulators_valid(),
         .accumulators      (accumulators)
