@@ -21,8 +21,10 @@ module tpu_controller #(
 
     output logic activation_read_req,
     output ADDR activation_read_addr,
+    input logic activation_read_valid,
     output logic weight_read_req,
     output ADDR weight_read_addr,
+    input logic weight_read_valid,
 
     output logic result_write_req,
     output ADDR result_write_addr,
@@ -40,18 +42,20 @@ module tpu_controller #(
 
     logic final_k_tile;
     ADDR tile_offset;
+    ADDR activation_tile_index;
+    ADDR weight_tile_index;
 
     assign final_k_tile = current_k_tile == (active_cmd.k_tiles - 1'b1);
     assign tile_offset = (current_m_tile * active_cmd.n_tiles) + current_n_tile;
+    assign activation_tile_index = (current_m_tile * active_cmd.k_tiles) + current_k_tile;
+    assign weight_tile_index = (current_k_tile * active_cmd.n_tiles) + current_n_tile;
 
     assign busy = state != STATE_IDLE;
     assign cmd_ready = state == STATE_IDLE;
 
-    assign activation_read_addr = active_cmd.activation_base_addr +
-                                  ((current_m_tile * active_cmd.k_tiles) + current_k_tile);
-    assign weight_read_addr = active_cmd.weight_base_addr +
-                              ((current_k_tile * active_cmd.n_tiles) + current_n_tile);
-    assign result_write_addr = active_cmd.output_base_addr + tile_offset;
+    assign activation_read_addr = active_cmd.activation_base_addr + (activation_tile_index * T);
+    assign weight_read_addr = active_cmd.weight_base_addr + (weight_tile_index * T);
+    assign result_write_addr = active_cmd.output_base_addr + (tile_offset * T * T);
     assign result_write_mask = accumulator_valid;
 
     always_comb begin
@@ -68,9 +72,12 @@ module tpu_controller #(
                 clear_accumulators = 1'b1;
             end
 
-            STATE_LOAD: begin
+            STATE_REQUEST: begin
                 activation_read_req = 1'b1;
                 weight_read_req = 1'b1;
+            end
+
+            STATE_WAIT_READ: begin
                 load_activations = 1'b1;
                 load_weights = 1'b1;
             end
@@ -111,11 +118,17 @@ module tpu_controller #(
                 end
 
                 STATE_CLEAR: begin
-                    state <= STATE_LOAD;
+                    state <= STATE_REQUEST;
                 end
 
-                STATE_LOAD: begin
-                    state <= STATE_START;
+                STATE_REQUEST: begin
+                    state <= STATE_WAIT_READ;
+                end
+
+                STATE_WAIT_READ: begin
+                    if (activation_read_valid && weight_read_valid) begin
+                        state <= STATE_START;
+                    end
                 end
 
                 STATE_START: begin
@@ -133,7 +146,7 @@ module tpu_controller #(
                 STATE_ADVANCE: begin
                     if (current_k_tile + 1'b1 < active_cmd.k_tiles) begin
                         current_k_tile <= current_k_tile + 1'b1;
-                        state <= STATE_LOAD;
+                        state <= STATE_REQUEST;
                     end else if (current_n_tile + 1'b1 < active_cmd.n_tiles) begin
                         current_k_tile <= '0;
                         current_n_tile <= current_n_tile + 1'b1;

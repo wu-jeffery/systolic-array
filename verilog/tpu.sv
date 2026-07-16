@@ -13,7 +13,9 @@ module tpu #(
     input TPU_CMD cmd,
 
     input DATA [T-1:0] activations_in,
+    input logic activations_valid,
     input DATA [T-1:0] weights_in,
+    input logic weights_valid,
 
     input logic fetch_result,
 
@@ -132,8 +134,10 @@ module tpu #(
         .start_compute      (start_compute),
         .activation_read_req(activation_read_req),
         .activation_read_addr(activation_read_addr),
+        .activation_read_valid(activations_valid),
         .weight_read_req    (weight_read_req),
         .weight_read_addr   (weight_read_addr),
+        .weight_read_valid  (weights_valid),
         .result_write_req   (result_write_req),
         .result_write_addr  (result_write_addr),
         .result_write_mask  (result_write_mask),

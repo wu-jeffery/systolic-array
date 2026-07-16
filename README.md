@@ -15,14 +15,18 @@ operations to the hardware.
 The current datapath is:
 
 ```text
-command queue
+host/software preload port
+  -> scratchpad
+  -> TPU system wrapper
+  -> command queue
   -> TPU controller
-  -> scratchpad-style activation/weight requests
+  -> scratchpad activation/weight vector reads
   -> activation buffer / weight buffer
   -> input skew buffers
   -> systolic array
   -> accumulator/result valid scheduling
-  -> result write request back toward scratchpad
+  -> masked result writes back to scratchpad
+  -> host/software readback port
 ```
 
 Main modules:
@@ -42,8 +46,16 @@ Main modules:
   result write requests.
 - `scratchpad`: synchronous SRAM-style local memory model with vector reads and
   masked result writes.
-- `tpu`: top-level module stitching the command queue, controller, buffers,
+- `tpu`: compute core stitching the command queue, controller, buffers,
   scheduler, and systolic array together.
+- `tpu_system`: system-level wrapper that connects the TPU core to the
+  scratchpad and exposes host/software ports for preloading inputs and reading
+  outputs.
+- `matrix_multiply_test`: testbench for one 4x4 matrix multiplication through
+  the TPU system and scratchpad.
+- `scripts/run_matrix_multiply.py`: Python harness that accepts two 4x4
+  matrices, generates the testbench include file, launches VCS, and prints the
+  result matrix.
 
 ## Tiling Model
 
@@ -67,12 +79,30 @@ accumulators once, then runs through all `k_tile`s without clearing. This lets
 partial products accumulate into the same output tile. Results are written only
 after the final reduction tile.
 
+For the current 4x4 matrix-multiply harness, the software/testbench writes A
+into scratchpad as contiguous activation column vectors and B as contiguous
+weight row vectors. The TPU command then points to those scratchpad regions and
+the controller walks the reduction tiles.
+
+## Demo Harness
+
+A matrix multiplication demo is coming soon. The current harness entrypoint is:
+
+```bash
+python3 scripts/run_matrix_multiply.py \
+  "1 2 3 4; 5 6 7 8; 9 10 11 12; 13 14 15 16" \
+  "1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1"
+```
+
+The script generates `build/matrix_input.svh`, runs the `matrix_multiply_test`
+testbench, and prints the output matrix in a readable format. It is intended to
+run on CAEN or another environment with VCS available.
+
 ## Near-Term Plan
 
 The next steps are:
 
-1. Connect the TPU controller to the scratchpad using real read-valid/write-ready
-   handshakes.
+1. Validate the matrix multiplication demo on CAEN with VCS.
 2. Expand the activation and weight buffers from single-vector staging into
    tile-streaming buffers.
 3. Add result buffering so completed MAC values can be packed and written back

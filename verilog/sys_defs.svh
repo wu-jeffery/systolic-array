@@ -24,7 +24,8 @@ typedef struct packed {
 typedef enum logic [2:0] {
     STATE_IDLE,
     STATE_CLEAR,
-    STATE_LOAD,
+    STATE_REQUEST,
+    STATE_WAIT_READ,
     STATE_START,
     STATE_RUN,
     STATE_ADVANCE

@@ -11,7 +11,9 @@ module tpu_test ();
     logic fetch_result;
 
     DATA [T-1:0] activations_in;
+    logic activations_valid;
     DATA [T-1:0] weights_in;
+    logic weights_valid;
     logic activation_read_req;
     ADDR activation_read_addr;
     logic weight_read_req;
@@ -35,7 +37,9 @@ module tpu_test ();
         .cmd_ready           (cmd_ready),
         .cmd                 (cmd),
         .activations_in      (activations_in),
+        .activations_valid   (activations_valid),
         .weights_in          (weights_in),
+        .weights_valid       (weights_valid),
         .fetch_result        (fetch_result),
         .activation_read_req (activation_read_req),
         .activation_read_addr(activation_read_addr),
@@ -73,6 +77,8 @@ module tpu_test ();
         reset = 1'b1;
         cmd_valid = 1'b0;
         fetch_result = 1'b0;
+        activations_valid = 1'b0;
+        weights_valid = 1'b0;
         cmd = '0;
 
         @(negedge clock);
@@ -108,6 +114,13 @@ module tpu_test ();
                      weight_read_addr, weight_read_req, $time);
             $finish;
         end
+
+        @(negedge clock);
+        activations_valid = 1'b1;
+        weights_valid = 1'b1;
+        @(negedge clock);
+        activations_valid = 1'b0;
+        weights_valid = 1'b0;
 
         wait (result_write_req);
         #1;
