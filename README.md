@@ -1,6 +1,6 @@
 # TPU / Systolic Array Accelerator
 
-This project is a small SystemVerilog TPU-style accelerator built around a
+This project is a SystemVerilog TPU-style accelerator built around a
 systolic array. The goal is to develop the core hardware pieces needed for a
 tiled matrix-multiply engine, then use that engine to run a simple neural
 network workload.
