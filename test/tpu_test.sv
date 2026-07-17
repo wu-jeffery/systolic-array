@@ -58,6 +58,63 @@ module tpu_test ();
 
     always #5 clock = ~clock;
 
+    task automatic wait_cycles(input int max_cycles, input string tag);
+        for (int i = 0; i < max_cycles; i++) begin
+            @(posedge clock);
+            if (activation_read_req || weight_read_req || result_write_req ||
+                accumulators_valid || done) begin
+                $display("[DBG] %s cycle=%0d t=%0t act_req=%0b act_addr=%0d wt_req=%0b wt_addr=%0d valid=%h wr_req=%0b wr_addr=%0d done=%0b busy=%0b",
+                         tag, i, $time, activation_read_req, activation_read_addr,
+                         weight_read_req, weight_read_addr, accumulator_valid,
+                         result_write_req, result_write_addr, done, busy);
+            end
+        end
+        $display("[FAIL] timeout waiting for %s @t=%0t", tag, $time);
+        $finish;
+    endtask
+
+    task automatic wait_for_activation_request(input int max_cycles);
+        for (int i = 0; i < max_cycles; i++) begin
+            @(posedge clock);
+            #1;
+            if (activation_read_req) begin
+                $display("[DBG] saw activation/weight request @t=%0t act_addr=%0d wt_addr=%0d",
+                         $time, activation_read_addr, weight_read_addr);
+                return;
+            end
+        end
+        wait_cycles(0, "activation request");
+    endtask
+
+    task automatic wait_for_result_write(input int max_cycles);
+        for (int i = 0; i < max_cycles; i++) begin
+            @(posedge clock);
+            #1;
+            if (result_write_req) begin
+                $display("[DBG] saw result write @t=%0t addr=%0d mask=%h done=%0b",
+                         $time, result_write_addr, result_write_mask, done);
+                return;
+            end
+        end
+        wait_cycles(0, "result write");
+    endtask
+
+    task automatic wait_for_done(input int max_cycles);
+        if (done) begin
+            return;
+        end
+
+        for (int i = 0; i < max_cycles; i++) begin
+            @(posedge clock);
+            #1;
+            if (done) begin
+                $display("[DBG] saw done @t=%0t", $time);
+                return;
+            end
+        end
+        wait_cycles(0, "done");
+    endtask
+
     always_comb begin
         activations_in = '{default: '0};
         weights_in = '{default: '0};
@@ -102,8 +159,7 @@ module tpu_test ();
         @(negedge clock);
         cmd_valid = 1'b0;
 
-        wait (activation_read_req);
-        #1;
+        wait_for_activation_request(100);
         if (activation_read_req !== 1'b1 || activation_read_addr !== 16'd100) begin
             $display("[FAIL] activation request addr=%0d req=%0b @t=%0t",
                      activation_read_addr, activation_read_req, $time);
@@ -122,15 +178,14 @@ module tpu_test ();
         activations_valid = 1'b0;
         weights_valid = 1'b0;
 
-        wait (result_write_req);
-        #1;
+        wait_for_result_write(100);
         if (result_write_addr !== 16'd300 || result_write_mask[0] !== 1'b1) begin
             $display("[FAIL] bad result write addr=%0d mask=%h @t=%0t",
                      result_write_addr, result_write_mask, $time);
             $finish;
         end
 
-        wait (done);
+        wait_for_done(100);
 
         $display("[PASS] TPU command queue/controller smoke test");
         $finish;
