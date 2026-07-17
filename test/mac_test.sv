@@ -158,13 +158,14 @@ module mac_test;
     prev_in_wt = '0;
     check_outputs("explicit_clear");
 
+    // Drop clear and drive the next vector in the same cycle. Leaving the old
+    // 9,9 inputs up for a cycle would correctly accumulate 81 before this check.
     @(negedge clock);
     clear_accumulator = 1'b0;
+    in_activation = DATA'(1);
+    in_weight = DATA'(8);
 
-    // Deassert reset again
-    // After reset, everything starts from 0 again
-    drive_inputs(DATA'(1), DATA'(8));
-    // out_* expected are 0 because reset drove them to 0 on last posedge
+    // After explicit clear, everything starts from 0 again.
     prev_in_act = DATA'(1);
     prev_in_wt  = DATA'(8);
     exp_acc     = exp_acc + (DATA'(1) * DATA'(8));
