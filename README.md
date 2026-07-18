@@ -38,12 +38,17 @@ Main modules:
   array.
 - `input_skew_buffer`: delays lane `i` by `i` cycles so inputs enter the array
   as a wavefront.
-- `tpu_scheduler`: tracks cycle timing for one array run and produces
-  per-accumulator valid bits.
-- `tpu_command_queue`: FIFO of coarse TPU commands.
-- `tpu_controller`: walks tiled matrix-multiply loops, controls buffer loads,
-  starts array runs, clears accumulators at output-tile boundaries, and emits
-  result write requests.
+- `tpu_command_queue`: FIFO of coarse TPU commands from software or a
+  testbench. It does not understand matrix multiplication timing; it only stores
+  descriptors until the controller is ready to start another operation.
+- `tpu_controller`: main operation state machine. It pops one command from the
+  queue, tracks the active `m_tile`, `n_tile`, and `k_tile`, requests
+  activation/weight vectors from scratchpad, waits for read-valid responses,
+  loads the input buffers, clears accumulators when starting a new output tile,
+  starts each array run, and emits result write requests.
+- `tpu_scheduler`: cycle-level timer for one systolic-array run. After
+  `start_compute`, it counts cycles and produces per-accumulator valid bits so
+  the controller knows which MAC outputs are ready to write.
 - `scratchpad`: synchronous SRAM-style local memory model with vector reads and
   masked result writes.
 - `tpu`: compute core stitching the command queue, controller, buffers,
@@ -56,6 +61,45 @@ Main modules:
 - `scripts/run_matrix_multiply.py`: Python harness that accepts two 4x4
   matrices, generates the testbench include file, launches VCS, and prints the
   result matrix.
+
+## Control Flow
+
+The command queue, controller, and scheduler operate at different levels:
+
+```text
+command queue:
+  stores work descriptors from software/testbench
+
+TPU controller:
+  turns one descriptor into tile-by-tile hardware actions
+
+TPU scheduler:
+  times one systolic-array run and marks MAC outputs valid
+```
+
+For one command, the interaction is:
+
+```text
+1. Software/testbench enqueues a TPU_CMD.
+2. tpu_command_queue holds the command until the controller is idle.
+3. tpu_controller dequeues the command and initializes tile counters.
+4. For each output tile, the controller clears MAC accumulators once.
+5. For each reduction tile, the controller requests A/B vectors from scratchpad.
+6. When read-valid returns, the controller loads the activation/weight buffers.
+7. The controller pulses start_compute.
+8. tpu_scheduler counts array cycles and raises accumulator_valid bits.
+9. On the final k_tile, the controller turns those valid bits into masked result
+   writes.
+10. The controller advances k_tile, n_tile, and m_tile until the command is done.
+```
+
+In short:
+
+```text
+command queue = what work should run next
+TPU controller = how to execute that work
+TPU scheduler = when MAC outputs from one array run are ready
+```
 
 ## Tiling Model
 
