@@ -43,8 +43,8 @@ module tpu #(
     logic load_weights;
     logic start_compute;
     logic clear_accumulators;
-    logic scheduler_busy;
-    logic scheduler_done;
+    logic array_scheduler_busy;
+    logic array_scheduler_done;
     logic controller_busy;
     logic controller_done;
     logic queued_cmd_valid;
@@ -104,16 +104,16 @@ module tpu #(
         .data_out(skewed_weights)
     );
 
-    tpu_scheduler #(
+    array_scheduler #(
         .T                   (T),
         .K                   (K),
         .MULT_PIPELINE_CYCLES(MULT_PIPELINE_CYCLES)
-    ) scheduler (
+    ) array_sched (
         .clock            (clock),
         .reset            (reset),
         .start_compute    (start_compute),
-        .busy             (scheduler_busy),
-        .done             (scheduler_done),
+        .busy             (array_scheduler_busy),
+        .done             (array_scheduler_done),
         .accumulator_valid(accumulator_valid)
     );
 
@@ -125,8 +125,8 @@ module tpu #(
         .cmd_valid          (queued_cmd_valid),
         .cmd_ready          (queued_cmd_ready),
         .cmd                (queued_cmd),
-        .array_busy         (scheduler_busy),
-        .array_done         (scheduler_done),
+        .array_busy         (array_scheduler_busy),
+        .array_done         (array_scheduler_done),
         .accumulator_valid  (accumulator_valid),
         .clear_accumulators (clear_accumulators),
         .load_activations   (load_activations),
@@ -145,7 +145,7 @@ module tpu #(
         .done               (controller_done)
     );
 
-    assign busy = controller_busy || scheduler_busy || queued_cmd_valid;
+    assign busy = controller_busy || array_scheduler_busy || queued_cmd_valid;
     assign done = controller_done;
     assign accumulators_valid = fetch_result | (|accumulator_valid);
     assign result_write_data = accumulators;

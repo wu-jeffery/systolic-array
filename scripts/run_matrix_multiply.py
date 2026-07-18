@@ -19,7 +19,7 @@ SOURCES = [
     "verilog/input_skew_buffer.sv",
     "verilog/scratchpad.sv",
     "verilog/tpu_command_queue.sv",
-    "verilog/tpu_scheduler.sv",
+    "verilog/array_scheduler.sv",
     "verilog/tpu_controller.sv",
     "verilog/systolic_array.sv",
     "verilog/tpu.sv",

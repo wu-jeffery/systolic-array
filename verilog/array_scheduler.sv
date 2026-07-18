@@ -1,6 +1,6 @@
 `include "verilog/sys_defs.svh"
 
-module tpu_scheduler #(
+module array_scheduler #(
     parameter int T = `ARRAY_SIZE,
     parameter int K = `ARRAY_SIZE,
     parameter int MULT_PIPELINE_CYCLES = `MULT_PIPELINE_CYCLES,
@@ -54,5 +54,10 @@ module tpu_scheduler #(
             end
         end
     end
+
+    // TODO: Make this scheduler tiling-aware once the input buffers stream
+    // full tiles. That will likely require coordination with tpu_controller so
+    // this block knows the compute length for each array run and whether the
+    // current reduction tile is the final one.
 
 endmodule

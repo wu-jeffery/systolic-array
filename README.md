@@ -46,13 +46,13 @@ Main modules:
   activation/weight vectors from scratchpad, waits for read-valid responses,
   loads the input buffers, clears accumulators when starting a new output tile,
   starts each array run, and emits result write requests.
-- `tpu_scheduler`: cycle-level timer for one systolic-array run. After
+- `array_scheduler`: cycle-level timer for one systolic-array run. After
   `start_compute`, it counts cycles and produces per-accumulator valid bits so
   the controller knows which MAC outputs are ready to write.
 - `scratchpad`: synchronous SRAM-style local memory model with vector reads and
   masked result writes.
 - `tpu`: compute core stitching the command queue, controller, buffers,
-  scheduler, and systolic array together.
+  array scheduler, and systolic array together.
 - `tpu_system`: system-level wrapper that connects the TPU core to the
   scratchpad and exposes host/software ports for preloading inputs and reading
   outputs.
@@ -64,7 +64,7 @@ Main modules:
 
 ## Control Flow
 
-The command queue, controller, and scheduler operate at different levels:
+The command queue, controller, and array scheduler operate at different levels:
 
 ```text
 command queue:
@@ -73,7 +73,7 @@ command queue:
 TPU controller:
   turns one descriptor into tile-by-tile hardware actions
 
-TPU scheduler:
+array scheduler:
   times one systolic-array run and marks MAC outputs valid
 ```
 
@@ -87,7 +87,7 @@ For one command, the interaction is:
 5. For each reduction tile, the controller requests A/B vectors from scratchpad.
 6. When read-valid returns, the controller loads the activation/weight buffers.
 7. The controller pulses start_compute.
-8. tpu_scheduler counts array cycles and raises accumulator_valid bits.
+8. array_scheduler counts array cycles and raises accumulator_valid bits.
 9. On the final k_tile, the controller turns those valid bits into masked result
    writes.
 10. The controller advances k_tile, n_tile, and m_tile until the command is done.
@@ -98,7 +98,7 @@ In short:
 ```text
 command queue = what work should run next
 TPU controller = how to execute that work
-TPU scheduler = when MAC outputs from one array run are ready
+array scheduler = when MAC outputs from one array run are ready
 ```
 
 ## Tiling Model
