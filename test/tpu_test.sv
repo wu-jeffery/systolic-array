@@ -27,6 +27,7 @@ module tpu_test ();
     logic accumulators_valid;
     logic [(T*T)-1:0] accumulator_valid;
     DATA [(T*T)-1:0] accumulators;
+    string dumpfile;
 
     tpu #(
         .T(T)
@@ -115,63 +116,6 @@ module tpu_test ();
         wait_cycles(0, "done");
     endtask
 
-    task automatic wait_cycles(input int max_cycles, input string tag);
-        for (int i = 0; i < max_cycles; i++) begin
-            @(posedge clock);
-            if (activation_read_req || weight_read_req || result_write_req ||
-                accumulators_valid || done) begin
-                $display("[DBG] %s cycle=%0d t=%0t act_req=%0b act_addr=%0d wt_req=%0b wt_addr=%0d valid=%h wr_req=%0b wr_addr=%0d done=%0b busy=%0b",
-                         tag, i, $time, activation_read_req, activation_read_addr,
-                         weight_read_req, weight_read_addr, accumulator_valid,
-                         result_write_req, result_write_addr, done, busy);
-            end
-        end
-        $display("[FAIL] timeout waiting for %s @t=%0t", tag, $time);
-        $finish;
-    endtask
-
-    task automatic wait_for_activation_request(input int max_cycles);
-        for (int i = 0; i < max_cycles; i++) begin
-            @(posedge clock);
-            #1;
-            if (activation_read_req) begin
-                $display("[DBG] saw activation/weight request @t=%0t act_addr=%0d wt_addr=%0d",
-                         $time, activation_read_addr, weight_read_addr);
-                return;
-            end
-        end
-        wait_cycles(0, "activation request");
-    endtask
-
-    task automatic wait_for_result_write(input int max_cycles);
-        for (int i = 0; i < max_cycles; i++) begin
-            @(posedge clock);
-            #1;
-            if (result_write_req) begin
-                $display("[DBG] saw result write @t=%0t addr=%0d mask=%h done=%0b",
-                         $time, result_write_addr, result_write_mask, done);
-                return;
-            end
-        end
-        wait_cycles(0, "result write");
-    endtask
-
-    task automatic wait_for_done(input int max_cycles);
-        if (done) begin
-            return;
-        end
-
-        for (int i = 0; i < max_cycles; i++) begin
-            @(posedge clock);
-            #1;
-            if (done) begin
-                $display("[DBG] saw done @t=%0t", $time);
-                return;
-            end
-        end
-        wait_cycles(0, "done");
-    endtask
-
     always_comb begin
         activations_in = '{default: '0};
         weights_in = '{default: '0};
@@ -187,6 +131,12 @@ module tpu_test ();
     end
 
     initial begin
+        if (!$value$plusargs("dumpfile=%s", dumpfile)) begin
+            dumpfile = "tpu.vcd";
+        end
+        $dumpfile(dumpfile);
+        $dumpvars(0, tpu_test);
+
         clock = 1'b0;
         reset = 1'b1;
         cmd_valid = 1'b0;

@@ -130,7 +130,7 @@ the controller walks the reduction tiles.
 
 ## Demo Harness
 
-A matrix multiplication demo is coming soon. The current harness entrypoint is:
+Run a 4x4 matrix multiplication through the TPU system testbench with:
 
 ```bash
 python3 scripts/run_matrix_multiply.py \
@@ -138,22 +138,21 @@ python3 scripts/run_matrix_multiply.py \
   "1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1"
 ```
 
-The script generates `build/matrix_input.svh`, runs the `matrix_multiply_test`
-testbench, and prints the output matrix in a readable format. It is intended to
-run on CAEN or another environment with VCS available.
+The script generates `build/matrix_input.svh`, runs `matrix_multiply_test`, and
+prints the output matrix in a readable format. It expects VCS to be available in
+the shell environment.
 
 ## Near-Term Plan
 
 The next steps are:
 
-1. Validate the matrix multiplication demo on CAEN with VCS.
-2. Expand the activation and weight buffers from single-vector staging into
+1. Expand the activation and weight buffers from single-vector staging into
    tile-streaming buffers.
-3. Add result buffering so completed MAC values can be packed and written back
+2. Add result buffering so completed MAC values can be packed and written back
    cleanly.
-4. Build a small command/runtime flow that loads weights and activations,
+3. Build a small command/runtime flow that loads weights and activations,
    launches tiled matrix multiplies, and reads results.
-5. Run a simple neural network, likely a tiny MLP, using the TPU matrix engine.
+4. Run a simple neural network, likely a tiny MLP, using the TPU matrix engine.
 
 The long-term direction is to make this a minimal but coherent accelerator
 stack: compiler/runtime commands at the top, scratchpad-managed tile movement in
