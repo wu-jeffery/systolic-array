@@ -254,6 +254,7 @@ module tpu_test ();
             @(negedge clock);
             activations_valid = 1'b1;
             weights_valid = 1'b1;
+            wait (dut.load_activations && dut.load_weights);
             @(negedge clock);
             activations_valid = 1'b0;
             weights_valid = 1'b0;

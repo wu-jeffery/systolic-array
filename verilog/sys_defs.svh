@@ -26,6 +26,7 @@ typedef enum logic [2:0] {
     STATE_CLEAR,
     STATE_REQUEST,
     STATE_WAIT_READ,
+    STATE_LOAD,
     STATE_START,
     STATE_RUN,
     STATE_ADVANCE

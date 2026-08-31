@@ -75,8 +75,11 @@ module tpu_controller #(
             STATE_REQUEST: begin
                 activation_read_req = 1'b1;
                 weight_read_req = 1'b1;
-                load_activations = activation_read_valid && weight_read_valid;
-                load_weights = activation_read_valid && weight_read_valid;
+            end
+
+            STATE_LOAD: begin
+                load_activations = 1'b1;
+                load_weights = 1'b1;
             end
 
             STATE_START: begin
@@ -120,6 +123,12 @@ module tpu_controller #(
 
                 STATE_REQUEST: begin
                     if (activation_read_valid && weight_read_valid) begin
+                        state <= STATE_LOAD;
+                    end
+                end
+
+                STATE_LOAD: begin
+                    if (!array_busy) begin
                         state <= STATE_START;
                     end
                 end
