@@ -27,6 +27,8 @@ module tpu_test ();
     logic accumulators_valid;
     logic [(T*T)-1:0] accumulator_valid;
     DATA [(T*T)-1:0] accumulators;
+    DATA matrix_a [T-1:0][T-1:0];
+    DATA matrix_b [T-1:0][T-1:0];
     string dumpfile;
 
     tpu #(
@@ -58,6 +60,78 @@ module tpu_test ();
     );
 
     always #5 clock = ~clock;
+
+    task automatic print_input_operation;
+        $display("\n[TPU] Matrix operation for this test:");
+        $display("      A (%0dx%0d):", T, T);
+        for (int r = 0; r < T; r++) begin
+            $write("      [");
+            for (int c = 0; c < T; c++) begin
+                $write(" %0d", matrix_a[r][c]);
+            end
+            $display(" ]");
+        end
+        $display("      B (%0dx%0d):", T, T);
+        for (int r = 0; r < T; r++) begin
+            $write("      [");
+            for (int c = 0; c < T; c++) begin
+                $write(" %0d", matrix_b[r][c]);
+            end
+            $display(" ]");
+        end
+        $display("      Computing C = A x B using %0d accumulated outer products\n", T);
+    endtask
+
+    task automatic check_result_matrix;
+        DATA expected;
+        int errors;
+
+        errors = 0;
+        for (int r = 0; r < T; r++) begin
+            for (int c = 0; c < T; c++) begin
+                expected = '0;
+                for (int k = 0; k < T; k++) begin
+                    expected = expected + (matrix_a[r][k] * matrix_b[k][c]);
+                end
+                if (accumulators[r*T + c] !== expected) begin
+                    $display("[FAIL] C[%0d][%0d]: expected %0d, got %0d",
+                             r, c, expected, accumulators[r*T + c]);
+                    errors++;
+                end
+            end
+        end
+
+        if (errors != 0) begin
+            $display("[FAIL] 4x4 matrix multiplication had %0d incorrect elements", errors);
+            $finish;
+        end
+    endtask
+
+    task automatic print_result_matrix(input string label);
+        $display("[TPU] %s C (%0dx%0d):", label, T, T);
+        for (int r = 0; r < T; r++) begin
+            $write("      [");
+            for (int c = 0; c < T; c++) begin
+                $write(" %0d", accumulators[r*T + c]);
+            end
+            $display(" ]");
+        end
+    endtask
+
+    always @(posedge clock) begin
+        if (!reset && result_write_req) begin
+            $display("[TPU] Writing completed result elements to scratchpad base address %0d:",
+                     result_write_addr);
+            for (int r = 0; r < T; r++) begin
+                for (int c = 0; c < T; c++) begin
+                    if (result_write_mask[r*T + c]) begin
+                        $display("      C[%0d][%0d] = %0d", r, c,
+                                 result_write_data[r*T + c]);
+                    end
+                end
+            end
+        end
+    end
 
     task automatic wait_cycles(input int max_cycles, input string tag);
         for (int i = 0; i < max_cycles; i++) begin
@@ -116,20 +190,6 @@ module tpu_test ();
         wait_cycles(0, "done");
     endtask
 
-    always_comb begin
-        activations_in = '{default: '0};
-        weights_in = '{default: '0};
-
-        activations_in[0] = 32'd2;
-        activations_in[1] = 32'd3;
-        activations_in[2] = 32'd4;
-        activations_in[3] = 32'd5;
-        weights_in[0] = 32'd7;
-        weights_in[1] = 32'd11;
-        weights_in[2] = 32'd13;
-        weights_in[3] = 32'd17;
-    end
-
     initial begin
         if (!$value$plusargs("dumpfile=%s", dumpfile)) begin
             dumpfile = "tpu.vcd";
@@ -143,7 +203,16 @@ module tpu_test ();
         fetch_result = 1'b0;
         activations_valid = 1'b0;
         weights_valid = 1'b0;
+        activations_in = '{default: '0};
+        weights_in = '{default: '0};
         cmd = '0;
+
+        for (int r = 0; r < T; r++) begin
+            for (int c = 0; c < T; c++) begin
+                matrix_a[r][c] = (r * T) + c + 1;
+                matrix_b[r][c] = (r * T) + c + 17;
+            end
+        end
 
         @(negedge clock);
         reset = 1'b0;
@@ -153,7 +222,8 @@ module tpu_test ();
         cmd.output_base_addr = 16'd300;
         cmd.m_tiles = 8'd1;
         cmd.n_tiles = 8'd1;
-        cmd.k_tiles = 8'd1;
+        cmd.k_tiles = T;
+        print_input_operation();
         cmd_valid = 1'b1;
 
         @(posedge clock);
@@ -166,24 +236,28 @@ module tpu_test ();
         @(negedge clock);
         cmd_valid = 1'b0;
 
-        wait_for_activation_request(100);
-        if (activation_read_req !== 1'b1 || activation_read_addr !== 16'd100) begin
-            $display("[FAIL] activation request addr=%0d req=%0b @t=%0t",
-                     activation_read_addr, activation_read_req, $time);
-            $finish;
-        end
-        if (weight_read_req !== 1'b1 || weight_read_addr !== 16'd200) begin
-            $display("[FAIL] weight request addr=%0d req=%0b @t=%0t",
-                     weight_read_addr, weight_read_req, $time);
-            $finish;
-        end
+        for (int k = 0; k < T; k++) begin
+            wait_for_activation_request(100);
+            if (activation_read_addr !== 16'd100 + (k * T) ||
+                weight_read_addr !== 16'd200 + (k * T)) begin
+                $display("[FAIL] reduction k=%0d requested act_addr=%0d wt_addr=%0d",
+                         k, activation_read_addr, weight_read_addr);
+                $finish;
+            end
 
-        @(negedge clock);
-        activations_valid = 1'b1;
-        weights_valid = 1'b1;
-        @(negedge clock);
-        activations_valid = 1'b0;
-        weights_valid = 1'b0;
+            for (int lane = 0; lane < T; lane++) begin
+                activations_in[lane] = matrix_a[lane][k];
+                weights_in[lane] = matrix_b[k][lane];
+            end
+            $display("[TPU] Reduction k=%0d: loading A[:,%0d] and B[%0d,:]", k, k, k);
+
+            @(negedge clock);
+            activations_valid = 1'b1;
+            weights_valid = 1'b1;
+            @(negedge clock);
+            activations_valid = 1'b0;
+            weights_valid = 1'b0;
+        end
 
         wait_for_result_write(100);
         if (result_write_addr !== 16'd300 || result_write_mask[0] !== 1'b1) begin
@@ -194,7 +268,10 @@ module tpu_test ();
 
         wait_for_done(100);
 
-        $display("[PASS] TPU command queue/controller smoke test");
+        print_result_matrix("Final result");
+        check_result_matrix();
+
+        $display("[PASS] TPU 4x4 matrix multiplication test");
         $finish;
     end
 

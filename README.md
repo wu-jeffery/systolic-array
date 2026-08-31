@@ -130,7 +130,14 @@ the controller walks the reduction tiles.
 
 ## Demo Harness
 
-Run a 4x4 matrix multiplication through the TPU system testbench with:
+Run an interactive 4x4 matrix multiplication with:
+
+```bash
+python3 scripts/run_matrix_multiply.py
+```
+
+The script prompts for four rows of A and four rows of B, prints `C = A * B`,
+and generates `build/matrix_input.svh`. Matrices can also be supplied directly:
 
 ```bash
 python3 scripts/run_matrix_multiply.py \
@@ -138,9 +145,17 @@ python3 scripts/run_matrix_multiply.py \
   "1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1"
 ```
 
-The script generates `build/matrix_input.svh`, runs `matrix_multiply_test`, and
-prints the output matrix in a readable format. It expects VCS to be available in
-the shell environment.
+To additionally run `matrix_multiply_test` and verify the result using the TPU
+RTL, add `--rtl`. This requires VCS and an available license:
+
+```bash
+python3 scripts/run_matrix_multiply.py --rtl \
+  "1 2 3 4; 5 6 7 8; 9 10 11 12; 13 14 15 16" \
+  "1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1"
+```
+
+Without `--rtl`, the displayed result is calculated by Python and does not
+verify the SystemVerilog implementation.
 
 ## Near-Term Plan
 

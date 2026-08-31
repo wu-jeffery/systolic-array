@@ -10,6 +10,7 @@ from pathlib import Path
 T = 4
 A_BASE = 100
 B_BASE = 200
+C_BASE = 300
 
 
 SOURCES = [
@@ -42,8 +43,32 @@ def parse_matrix(text, name):
     return matrix
 
 
+def prompt_matrix(name):
+    print(f"\nEnter matrix {name}, one row at a time ({T} integers per row).")
+    matrix = []
+    for row_index in range(T):
+        while True:
+            row = input(f"{name} row {row_index + 1}: ").strip()
+            values = [value for value in re.split(r"[\s,]+", row) if value]
+            if len(values) != T:
+                print(f"Please enter exactly {T} integers; you entered {len(values)}.")
+                continue
+            try:
+                matrix.append([int(value, 0) for value in values])
+                break
+            except ValueError:
+                print("Please use integers only (for example: 1 2 3 4).")
+    return matrix
+
+
 def matmul(a, b):
     return [[sum(a[r][k] * b[k][c] for k in range(T)) for c in range(T)] for r in range(T)]
+
+
+def print_matrix(label, matrix):
+    print(f"{label}:")
+    for row in matrix:
+        print("  [ " + " ".join(f"{value:>6}" for value in row) + " ]")
 
 
 def sv_u32(value):
@@ -132,14 +157,21 @@ def main():
     parser = argparse.ArgumentParser(description="Run one 4x4 matrix multiply on the TPU testbench.")
     parser.add_argument("a", nargs="?", help="Matrix A rows separated by semicolons.")
     parser.add_argument("b", nargs="?", help="Matrix B rows separated by semicolons.")
+    parser.add_argument(
+        "--software-only",
+        action="store_true",
+        help="Deprecated alias for the default Python calculation mode.",
+    )
+    parser.add_argument(
+        "--rtl",
+        action="store_true",
+        help="Also compile and verify the result using the TPU RTL and VCS.",
+    )
     args = parser.parse_args()
 
-    matrix_a = args.a or input("Enter matrix A as 4 semicolon-separated rows:\n")
-    matrix_b = args.b or input("Enter matrix B as 4 semicolon-separated rows:\n")
-
     try:
-        a = parse_matrix(matrix_a, "A")
-        b = parse_matrix(matrix_b, "B")
+        a = parse_matrix(args.a, "A") if args.a else prompt_matrix("A")
+        b = parse_matrix(args.b, "B") if args.b else prompt_matrix("B")
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -151,18 +183,30 @@ def main():
     (repo_root / "vcd").mkdir(exist_ok=True)
     write_matrix_include(repo_root / "build" / "matrix_input.svh", a, b, c)
 
+    print_matrix("Matrix A", a)
+    print_matrix("Matrix B", b)
+    print(f"Scratchpad layout: A columns at {A_BASE}-{A_BASE + T*T - 1}, "
+          f"B rows at {B_BASE}-{B_BASE + T*T - 1}, "
+          f"output at {C_BASE}-{C_BASE + T*T - 1}")
+    print("\nEXPECTED RESULT:")
+    print_matrix("C = A x B", c)
+
+    if not args.rtl:
+        print("\nCalculated with Python. Use --rtl to also verify this result on the TPU RTL.")
+        print(f"\nGenerated RTL input file: {repo_root / 'build' / 'matrix_input.svh'}")
+        return 0
+
     try:
         ensure_vcs_available()
         output = run_vcs(repo_root)
     except (RuntimeError, subprocess.CalledProcessError) as exc:
         print(f"error: {exc}", file=sys.stderr)
+        print(
+            "hint: the matrix result above is still available, but RTL verification "
+            "requires a working VCS license.",
+            file=sys.stderr,
+        )
         return 127 if isinstance(exc, RuntimeError) else exc.returncode
-
-    rows = extract_result(output)
-    if rows:
-        print("\nReadable result:")
-        for row in rows:
-            print(f"  {row}")
 
     return 0
 
