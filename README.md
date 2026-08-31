@@ -157,7 +157,11 @@ python3 scripts/run_matrix_multiply.py --rtl \
 Without `--rtl`, the displayed result is calculated by Python and does not
 verify the SystemVerilog implementation.
 
-Video reference: [4x4 matrix multiplication running on the TPU testbench](https://youtu.be/j_hraJYJYjQ).
+Demo video:
+
+[![4x4 matrix multiplication running on the TPU testbench](https://img.youtube.com/vi/j_hraJYJYjQ/hqdefault.jpg)](https://youtu.be/j_hraJYJYjQ)
+
+[Watch the 4x4 matrix multiplication demo](https://youtu.be/j_hraJYJYjQ).
 
 ## Near-Term Plan
 
