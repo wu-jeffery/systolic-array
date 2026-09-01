@@ -6,6 +6,7 @@
 
 # List your modules here (names must match verilog/<name>.sv and test/<name>_test.sv)
 MODULES := adder mac input_skew_buffer scratchpad systolic_array tpu tpu_system
+TESTS := $(MODULES) tiling
 
 COMMON_RTL := verilog/mac.sv verilog/activation_buffer.sv verilog/weight_buffer.sv verilog/input_skew_buffer.sv verilog/scratchpad.sv verilog/tpu_command_queue.sv verilog/array_scheduler.sv verilog/tpu_controller.sv verilog/systolic_array.sv verilog/tpu.sv
 
@@ -55,6 +56,7 @@ help:
 	@echo "  make <module>.syn.run    # compile + run gate-level sim"
 	@echo ""
 	@echo "Modules: $(MODULES)"
+	@echo "Tests:   $(TESTS)"
 	@echo ""
 
 .PHONY: help
@@ -64,22 +66,29 @@ help:
 #########################################
 
 # Build sim executable: build/<module>.simv
+
+# Most tests have a matching verilog/<module>.sv. The tiling test is an
+# integration test whose DUT is tpu_system, so it only needs the common RTL.
 $(MODULES:%=$(BUILD_DIR)/%.simv): $(BUILD_DIR)/%.simv: verilog/%.sv test/%_test.sv $(COMMON_RTL) verilog/sys_defs.svh | $(BUILD_DIR)
 	@echo "==> [VCS] Building RTL sim $@"
 	@$(LOAD_TOOLS) $(VCS_SIM) $(filter-out verilog/$*.sv,$(COMMON_RTL)) verilog/$*.sv test/$*_test.sv -o $@
 
+$(BUILD_DIR)/tiling.simv: test/tiling_test.sv $(COMMON_RTL) verilog/tpu_system.sv verilog/sys_defs.svh | $(BUILD_DIR)
+	@echo "==> [VCS] Building RTL sim $@"
+	@$(LOAD_TOOLS) $(VCS_SIM) $(COMMON_RTL) verilog/tpu_system.sv test/tiling_test.sv -o $@
+
 # Run sim: make <module>
-$(MODULES): %: $(BUILD_DIR)/%.simv
+$(TESTS): %: $(BUILD_DIR)/%.simv
 	@echo "==> [RUN] RTL sim for $*"
 	@cd $(BUILD_DIR) && ./$(notdir $<) $(SIM_RUN_FLAGS) +dumpfile=../$(VCD_DIR)/$*.vcd | tee $*.out
 	@echo "==> Output: $(BUILD_DIR)/$*.out"
 
 # Verdi: make <module>.verdi
-$(MODULES:%=%.verdi): %.verdi: $(BUILD_DIR)/%.simv
+$(TESTS:%=%.verdi): %.verdi: $(BUILD_DIR)/%.simv
 	@echo "==> [VERDI] RTL sim for $*"
 	@cd $(BUILD_DIR) && ./$(notdir $<) $(RUN_VERDI)
 
-.PHONY: $(MODULES) $(MODULES:%=%.verdi)
+.PHONY: $(TESTS) $(TESTS:%=%.verdi)
 
 #########################################
 # --- Synthesis: make adder.syn

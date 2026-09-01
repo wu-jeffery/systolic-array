@@ -55,9 +55,8 @@ module array_scheduler #(
         end
     end
 
-    // TODO: Make this scheduler tiling-aware once the input buffers stream
-    // full tiles. That will likely require coordination with tpu_controller so
-    // this block knows the compute length for each array run and whether the
-    // current reduction tile is the final one.
+    // Tile coordinates stay in tpu_controller. This scheduler only times one
+    // array run. In the functional implementation each run injects one outer
+    // product; K remains conservative drain latency until inputs are streamed.
 
 endmodule

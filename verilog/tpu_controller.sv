@@ -38,17 +38,19 @@ module tpu_controller #(
     TPU_CMD active_cmd;
     logic [`TILE_COUNT_WIDTH-1:0] current_m_tile;
     logic [`TILE_COUNT_WIDTH-1:0] current_n_tile;
-    logic [`TILE_COUNT_WIDTH-1:0] current_k_tile;
+    // The functional implementation launches one outer product for each
+    // scalar K position. This is a K step, rather than a full T-wide K tile.
+    logic [`TILE_COUNT_WIDTH-1:0] current_k_step;
 
-    logic final_k_tile;
+    logic final_k_step;
     ADDR tile_offset;
     ADDR activation_tile_index;
     ADDR weight_tile_index;
 
-    assign final_k_tile = current_k_tile == (active_cmd.k_tiles - 1'b1);
+    assign final_k_step = current_k_step == (active_cmd.k_tiles - 1'b1);
     assign tile_offset = (current_m_tile * active_cmd.n_tiles) + current_n_tile;
-    assign activation_tile_index = (current_m_tile * active_cmd.k_tiles) + current_k_tile;
-    assign weight_tile_index = (current_k_tile * active_cmd.n_tiles) + current_n_tile;
+    assign activation_tile_index = (current_m_tile * active_cmd.k_tiles) + current_k_step;
+    assign weight_tile_index = (current_k_step * active_cmd.n_tiles) + current_n_tile;
 
     assign busy = state != STATE_IDLE;
     assign cmd_ready = state == STATE_IDLE;
@@ -87,7 +89,7 @@ module tpu_controller #(
             end
 
             STATE_RUN: begin
-                result_write_req = final_k_tile && (|accumulator_valid);
+                result_write_req = final_k_step && (|accumulator_valid);
             end
 
             default: begin
@@ -101,7 +103,7 @@ module tpu_controller #(
             active_cmd <= '0;
             current_m_tile <= '0;
             current_n_tile <= '0;
-            current_k_tile <= '0;
+            current_k_step <= '0;
             done <= 1'b0;
         end else begin
             done <= 1'b0;
@@ -112,7 +114,7 @@ module tpu_controller #(
                         active_cmd <= cmd;
                         current_m_tile <= '0;
                         current_n_tile <= '0;
-                        current_k_tile <= '0;
+                        current_k_step <= '0;
                         state <= STATE_CLEAR;
                     end
                 end
@@ -146,15 +148,15 @@ module tpu_controller #(
                 end
 
                 STATE_ADVANCE: begin
-                    if (current_k_tile + 1'b1 < active_cmd.k_tiles) begin
-                        current_k_tile <= current_k_tile + 1'b1;
+                    if (current_k_step + 1'b1 < active_cmd.k_tiles) begin
+                        current_k_step <= current_k_step + 1'b1;
                         state <= STATE_REQUEST;
                     end else if (current_n_tile + 1'b1 < active_cmd.n_tiles) begin
-                        current_k_tile <= '0;
+                        current_k_step <= '0;
                         current_n_tile <= current_n_tile + 1'b1;
                         state <= STATE_CLEAR;
                     end else if (current_m_tile + 1'b1 < active_cmd.m_tiles) begin
-                        current_k_tile <= '0;
+                        current_k_step <= '0;
                         current_n_tile <= '0;
                         current_m_tile <= current_m_tile + 1'b1;
                         state <= STATE_CLEAR;
