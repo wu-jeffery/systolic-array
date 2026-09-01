@@ -2,7 +2,6 @@
 
 module array_scheduler #(
     parameter int T = `ARRAY_SIZE,
-    parameter int K = `ARRAY_SIZE,
     parameter int MULT_PIPELINE_CYCLES = `MULT_PIPELINE_CYCLES,
     parameter int COUNT_WIDTH = 16
 )(
@@ -10,25 +9,26 @@ module array_scheduler #(
     input logic reset,
 
     input logic start_compute,
+    input logic [`TILE_COUNT_WIDTH-1:0] compute_length,
 
     output logic busy,
     output logic done,
     output logic [(T*T)-1:0] accumulator_valid
 );
 
-    localparam int LAST_RESULT_CYCLE = K + ((T - 1) * 2) + MULT_PIPELINE_CYCLES;
-
     logic [COUNT_WIDTH-1:0] cycle_count;
+    logic [COUNT_WIDTH-1:0] active_compute_length;
+    logic [COUNT_WIDTH-1:0] last_result_cycle;
+
+    assign last_result_cycle = active_compute_length
+                             + ((T - 1) * 2)
+                             + MULT_PIPELINE_CYCLES;
 
     always_comb begin
         accumulator_valid = '0;
 
-        for (int r = 0; r < T; r++) begin
-            for (int c = 0; c < T; c++) begin
-                if (busy && cycle_count == (K + r + c + MULT_PIPELINE_CYCLES)) begin
-                    accumulator_valid[r*T + c] = 1'b1;
-                end
-            end
+        if (busy && cycle_count == last_result_cycle) begin
+            accumulator_valid = {T*T{1'b1}};
         end
     end
 
@@ -37,14 +37,16 @@ module array_scheduler #(
             busy <= 1'b0;
             done <= 1'b0;
             cycle_count <= '0;
+            active_compute_length <= '0;
         end else begin
             done <= 1'b0;
 
             if (start_compute && !busy) begin
                 busy <= 1'b1;
                 cycle_count <= '0;
+                active_compute_length <= compute_length;
             end else if (busy) begin
-                if (cycle_count == LAST_RESULT_CYCLE) begin
+                if (cycle_count == last_result_cycle) begin
                     busy <= 1'b0;
                     done <= 1'b1;
                     cycle_count <= '0;
@@ -55,8 +57,8 @@ module array_scheduler #(
         end
     end
 
-    // Tile coordinates stay in tpu_controller. This scheduler only times one
-    // array run. In the functional implementation each run injects one outer
-    // product; K remains conservative drain latency until inputs are streamed.
+    // Tile coordinates stay in tpu_controller. This scheduler times one
+    // continuous stream of compute_length outer products and then waits for
+    // the final wavefront to drain from the array.
 
 endmodule

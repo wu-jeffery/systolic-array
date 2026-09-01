@@ -35,13 +35,12 @@ module tpu #(
     output DATA [(T*T)-1:0] accumulators
 );
 
-    DATA [T-1:0] buffered_activations;
-    DATA [T-1:0] buffered_weights;
     DATA [T-1:0] skewed_activations;
     DATA [T-1:0] skewed_weights;
     logic load_activations;
     logic load_weights;
     logic start_compute;
+    logic [`TILE_COUNT_WIDTH-1:0] compute_length;
     logic clear_accumulators;
     logic array_scheduler_busy;
     logic array_scheduler_done;
@@ -62,34 +61,15 @@ module tpu #(
         .dequeue_cmd  (queued_cmd)
     );
 
-    activation_buffer #(
-        .T(T)
-    ) act_buffer (
-        .clock          (clock),
-        .reset          (reset),
-        .load           (load_activations),
-        .activations_in (activations_in),
-        .activations_out(buffered_activations)
-    );
-
-    weight_buffer #(
-        .T(T)
-    ) wt_buffer (
-        .clock      (clock),
-        .reset      (reset),
-        .load       (load_weights),
-        .weights_in (weights_in),
-        .weights_out(buffered_weights)
-    );
-
+    // Valid scratchpad responses stream directly into the skew pipelines.
     input_skew_buffer #(
         .T(T)
     ) activation_skew (
         .clock   (clock),
         .reset   (reset),
         .clear   (clear_accumulators),
-        .load    (start_compute),
-        .data_in (buffered_activations),
+        .load    (load_activations && load_weights),
+        .data_in (activations_in),
         .data_out(skewed_activations)
     );
 
@@ -99,19 +79,19 @@ module tpu #(
         .clock   (clock),
         .reset   (reset),
         .clear   (clear_accumulators),
-        .load    (start_compute),
-        .data_in (buffered_weights),
+        .load    (load_activations && load_weights),
+        .data_in (weights_in),
         .data_out(skewed_weights)
     );
 
     array_scheduler #(
         .T                   (T),
-        .K                   (K),
         .MULT_PIPELINE_CYCLES(MULT_PIPELINE_CYCLES)
     ) array_sched (
         .clock            (clock),
         .reset            (reset),
         .start_compute    (start_compute),
+        .compute_length   (compute_length),
         .busy             (array_scheduler_busy),
         .done             (array_scheduler_done),
         .accumulator_valid(accumulator_valid)
@@ -127,11 +107,11 @@ module tpu #(
         .cmd                (queued_cmd),
         .array_busy         (array_scheduler_busy),
         .array_done         (array_scheduler_done),
-        .accumulator_valid  (accumulator_valid),
         .clear_accumulators (clear_accumulators),
         .load_activations   (load_activations),
         .load_weights       (load_weights),
         .start_compute      (start_compute),
+        .compute_length     (compute_length),
         .activation_read_req(activation_read_req),
         .activation_read_addr(activation_read_addr),
         .activation_read_valid(activations_valid),
