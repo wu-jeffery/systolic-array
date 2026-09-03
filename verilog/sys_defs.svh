@@ -3,7 +3,7 @@
 
 `timescale 1ns/100ps
 
-`define ARRAY_SIZE 4
+`define ARRAY_SIZE 16
 `define MULT_PIPELINE_CYCLES 0
 `define ADDR_WIDTH 16
 `define TILE_COUNT_WIDTH 8

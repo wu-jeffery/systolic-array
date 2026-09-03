@@ -149,11 +149,11 @@ while K streams through the array. The completed `T x T` tile is then written to
 scratchpad in one masked write phase before the controller moves to the next
 M/N tile.
 
-For the current 4x4 matrix-multiply harness, the software/testbench writes A
+For the matrix-multiply harness, the software/testbench writes A
 into scratchpad as contiguous activation column vectors and B as contiguous
 weight row vectors. The TPU command then points to those scratchpad regions and
 the controller walks the K steps. The `tiling_test` exercises the same datapath
-with 8x8, 12x12, and 16x16 matrices on the 4x4 array.
+with one-tile and multi-tile matrices sized from the configured array dimension.
 
 ## Post-Processing
 
@@ -237,7 +237,7 @@ buffer and drain it through a `T`-lane vector unit one row per cycle.
 ## Try It Yourself
 
 This demo lets you send matrices through the TPU interface, see how they are
-divided into tiles for the 4x4 systolic array, and inspect the resulting output.
+divided into tiles for the configured systolic array, and inspect the resulting output.
 The free Verilator flow makes the RTL simulation available without a commercial
 license. University of Michigan engineering students with access to CAEN can
 also use the Synopsys VCS and Verdi tools already supported by the project.
@@ -349,15 +349,16 @@ without `--verbose`.
 Without `--rtl`, the command is only a quick preview of the demo inputs and
 expected output; it does not run or verify the SystemVerilog implementation.
 
-With `--rtl`, dimensions that do not fill the 4x4 array are automatically
-zero-padded into complete edge tiles. The harness reads back and displays only
-the requested `M x N` result.
+With `--rtl`, dimensions that do not fill the array are automatically
+zero-padded into complete edge tiles. The harness reads `ARRAY_SIZE` from
+`verilog/sys_defs.svh`, uses the same size as the RTL, and displays only the
+requested `M x N` result.
 
 The matrix-multiply harness currently configures `bias_enable = 0` and
 `activation_type = ACT_NONE`. Results still cross the registered
 post-processing stages, but both stages operate as unchanged-data bypasses.
-The tiling test covers 8x8, 12x12, and 16x16 bypassed operations and an 8x8
-operation with per-column bias and ReLU enabled across multiple output tiles.
+The tiling test scales with `ARRAY_SIZE`: it covers one-tile and four-tile
+operations, plus a one-tile operation with per-column bias and ReLU enabled.
 
 ### Using Synopsys tools on U-M CAEN
 

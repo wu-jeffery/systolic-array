@@ -2,11 +2,12 @@
 
 module tiling_test ();
     localparam int T = `ARRAY_SIZE;
-    localparam int MAX_MATRIX_SIZE = 16;
+    localparam int MAX_MATRIX_SIZE = 2 * T;
     localparam ADDR A_BASE = 16'd0;
-    localparam ADDR B_BASE = 16'd256;
-    localparam ADDR C_BASE = 16'd512;
-    localparam ADDR BIAS_BASE = 16'd800;
+    localparam ADDR B_BASE = A_BASE + (MAX_MATRIX_SIZE * MAX_MATRIX_SIZE);
+    localparam ADDR C_BASE = B_BASE + (MAX_MATRIX_SIZE * MAX_MATRIX_SIZE);
+    localparam ADDR BIAS_BASE = C_BASE + (MAX_MATRIX_SIZE * MAX_MATRIX_SIZE);
+    localparam int SCRATCHPAD_DEPTH = BIAS_BASE + MAX_MATRIX_SIZE + 16;
 
     logic clock;
     logic reset;
@@ -37,7 +38,8 @@ module tiling_test ();
 
     tpu_system #(
         .T(T),
-        .K(T)
+        .K(T),
+        .SCRATCHPAD_DEPTH(SCRATCHPAD_DEPTH)
     ) dut (
         .clock           (clock),
         .reset           (reset),
@@ -328,10 +330,9 @@ module tiling_test ();
 
         postprocessing_expected = 1'b0;
 
-        run_tiling_case(8, 1'b0);
-        run_tiling_case(12, 1'b0);
-        run_tiling_case(16, 1'b0);
-        run_tiling_case(8, 1'b1);
+        run_tiling_case(T, 1'b0);
+        run_tiling_case(2 * T, 1'b0);
+        run_tiling_case(T, 1'b1);
 
         $display("\n[PASS] all functional tiling cases passed");
         $finish;

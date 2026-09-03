@@ -1,7 +1,7 @@
 `include "verilog/sys_defs.svh"
 
 module systolic_array #(
-    parameter int T = 4,
+    parameter int T = `ARRAY_SIZE,
     parameter int MULT_PIPELINE_CYCLES = `MULT_PIPELINE_CYCLES
 )(
     input logic clock,

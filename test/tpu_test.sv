@@ -69,6 +69,46 @@ module tpu_test ();
 
     always #5 clock = ~clock;
 
+    // Model the scratchpad's one-cycle, fully pipelined vector-read response.
+    // The controller issues a new K vector every cycle, so a serialized
+    // request/response loop would miss requests when T is greater than 4.
+    always @(negedge clock) begin
+        if (reset) begin
+            activations_valid = 1'b0;
+            weights_valid = 1'b0;
+            activations_in = '{default: '0};
+            weights_in = '{default: '0};
+        end else begin
+            activations_valid = activation_read_req;
+            weights_valid = weight_read_req;
+
+            if (activation_read_req || weight_read_req) begin
+                int activation_k;
+                int weight_k;
+
+                if (!activation_read_req || !weight_read_req) begin
+                    $fatal(1, "activation and weight requests must be issued together");
+                end
+
+                activation_k = (activation_read_addr - 16'd100) / T;
+                weight_k = (weight_read_addr - 16'd200) / T;
+                if (activation_read_addr !== 16'd100 + (activation_k * T) ||
+                    weight_read_addr !== 16'd200 + (weight_k * T) ||
+                    activation_k != weight_k || activation_k < 0 || activation_k >= T) begin
+                    $fatal(1, "invalid vector request act_addr=%0d wt_addr=%0d",
+                           activation_read_addr, weight_read_addr);
+                end
+
+                for (int lane = 0; lane < T; lane++) begin
+                    activations_in[lane] = matrix_a[lane][activation_k];
+                    weights_in[lane] = matrix_b[weight_k][lane];
+                end
+                $display("[TPU] Reduction k=%0d: loading A[:,%0d] and B[%0d,:]",
+                         activation_k, activation_k, weight_k);
+            end
+        end
+    end
+
     task automatic print_input_operation;
         $display("\n[TPU] Matrix operation for this test:");
         $display("      A (%0dx%0d):", T, T);
@@ -110,7 +150,8 @@ module tpu_test ();
         end
 
         if (errors != 0) begin
-            $display("[FAIL] 4x4 matrix multiplication had %0d incorrect elements", errors);
+            $display("[FAIL] %0dx%0d matrix multiplication had %0d incorrect elements",
+                     T, T, errors);
             $finish;
         end
     endtask
@@ -246,30 +287,6 @@ module tpu_test ();
         @(negedge clock);
         cmd_valid = 1'b0;
 
-        for (int k = 0; k < T; k++) begin
-            wait_for_activation_request(100);
-            if (activation_read_addr !== 16'd100 + (k * T) ||
-                weight_read_addr !== 16'd200 + (k * T)) begin
-                $display("[FAIL] reduction k=%0d requested act_addr=%0d wt_addr=%0d",
-                         k, activation_read_addr, weight_read_addr);
-                $finish;
-            end
-
-            for (int lane = 0; lane < T; lane++) begin
-                activations_in[lane] = matrix_a[lane][k];
-                weights_in[lane] = matrix_b[k][lane];
-            end
-            $display("[TPU] Reduction k=%0d: loading A[:,%0d] and B[%0d,:]", k, k, k);
-
-            @(negedge clock);
-            activations_valid = 1'b1;
-            weights_valid = 1'b1;
-            wait (dut.load_activations && dut.load_weights);
-            @(negedge clock);
-            activations_valid = 1'b0;
-            weights_valid = 1'b0;
-        end
-
         wait_for_result_write(100);
         if (result_write_addr !== 16'd300 || result_write_mask[0] !== 1'b1) begin
             $display("[FAIL] bad result write addr=%0d mask=%h @t=%0t",
@@ -282,7 +299,7 @@ module tpu_test ();
         print_result_matrix("Final result");
         check_result_matrix();
 
-        $display("[PASS] TPU 4x4 matrix multiplication test");
+        $display("[PASS] TPU %0dx%0d matrix multiplication test", T, T);
         $finish;
     end
 

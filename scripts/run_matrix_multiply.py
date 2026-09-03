@@ -7,10 +7,22 @@ import sys
 from pathlib import Path
 
 
-T = 4
+REPO_ROOT = Path(__file__).resolve().parents[1]
 A_BASE = 100
-B_BASE = 200
-C_BASE = 300
+
+
+def read_array_size():
+    definitions = (REPO_ROOT / "verilog" / "sys_defs.svh").read_text(encoding="utf-8")
+    match = re.search(r"^\s*`define\s+ARRAY_SIZE\s+(\d+)\s*$", definitions, re.MULTILINE)
+    if not match:
+        raise RuntimeError("could not read ARRAY_SIZE from verilog/sys_defs.svh")
+    size = int(match.group(1))
+    if size <= 0:
+        raise RuntimeError("ARRAY_SIZE must be a positive integer")
+    return size
+
+
+T = read_array_size()
 
 
 SOURCES = [
@@ -338,7 +350,7 @@ def main():
     padded_m = round_up(a_rows, T)
     padded_n = round_up(b_columns, T)
 
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = REPO_ROOT
 
     print_matrix("Matrix A", a)
     print_matrix("Matrix B", b)
@@ -365,6 +377,7 @@ def main():
         return 2
 
     print(
+        f"TPU array size: {T}x{T}\n"
         f"RTL tiling: {a_rows}x{a_columns} * {a_columns}x{b_columns} "
         f"uses a {padded_m}x{b_columns} A edge layout and "
         f"{a_columns}x{padded_n} B edge layout"
