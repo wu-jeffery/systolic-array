@@ -332,7 +332,19 @@ Every RTL run prints the input matrices, expected result, tiling dimensions,
 simulator name, and TPU result. It also creates:
 
 - `build/matrix_multiply.out`: simulation console output.
+- `build/verilator_compile.out`: Verilator compiler output and warnings.
 - `vcd/matrix_multiply.vcd`: a waveform file for a viewer such as GTKWave.
+
+Verilator compiler warnings are kept out of the terminal during a successful
+run. To display the complete compilation output while the demo runs, add
+`--verbose`:
+
+```bash
+python3 scripts/run_matrix_multiply.py --rtl --sim verilator --verbose
+```
+
+If compilation fails, the relevant compiler output is always displayed even
+without `--verbose`.
 
 Without `--rtl`, the command is only a quick preview of the demo inputs and
 expected output; it does not run or verify the SystemVerilog implementation.

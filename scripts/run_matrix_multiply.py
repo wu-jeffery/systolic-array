@@ -235,10 +235,11 @@ def run_vcs(repo_root):
     return result.stdout
 
 
-def run_verilator(repo_root):
+def run_verilator(repo_root, verbose=False):
     build_dir = repo_root / "build" / "verilator_matrix_multiply"
     simv = build_dir / "matrix_multiply.simv"
     out_file = repo_root / "build" / "matrix_multiply.out"
+    compile_log = repo_root / "build" / "verilator_compile.out"
 
     compile_cmd = [
         "verilator",
@@ -256,7 +257,24 @@ def run_verilator(repo_root):
         "-Iverilog",
         *SOURCES,
     ]
-    subprocess.run(compile_cmd, cwd=repo_root, check=True)
+    compile_result = subprocess.run(
+        compile_cmd,
+        cwd=repo_root,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    compile_log.write_text(compile_result.stdout, encoding="utf-8")
+    if verbose or compile_result.returncode != 0:
+        print(compile_result.stdout, end="", file=sys.stderr)
+    elif compile_result.stdout.strip():
+        print(f"Verilator compile details: {compile_log}")
+    if compile_result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            compile_result.returncode,
+            compile_cmd,
+            output=compile_result.stdout,
+        )
 
     run_cmd = [str(simv), "+dumpfile=vcd/matrix_multiply.vcd"]
     result = subprocess.run(
@@ -291,6 +309,11 @@ def main():
         choices=("auto", "verilator", "vcs"),
         default="auto",
         help="RTL simulator to use (default: auto, preferring Verilator).",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show simulator compilation output instead of only saving it to a log.",
     )
     args = parser.parse_args()
 
@@ -351,7 +374,7 @@ def main():
         simulator = select_simulator(args.sim)
         print(f"RTL simulator: {simulator}")
         if simulator == "verilator":
-            output = run_verilator(repo_root)
+            output = run_verilator(repo_root, verbose=args.verbose)
         else:
             output = run_vcs(repo_root)
     except (RuntimeError, subprocess.CalledProcessError) as exc:
