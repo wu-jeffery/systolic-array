@@ -24,6 +24,7 @@ module tpu_system_test ();
     logic done;
     DATA [T-1:0] test_activations;
     DATA [T-1:0] test_weights;
+    DATA [T-1:0] test_biases;
     DATA [(T*T)-1:0] output_matrix;
 
     tpu_system #(
@@ -56,6 +57,18 @@ module tpu_system_test ();
         @(negedge clock);
         host_write_req = 1'b0;
     endtask
+
+    function automatic DATA expected_postprocess(
+        input DATA activation_value,
+        input DATA weight_value,
+        input DATA bias_value
+    );
+        logic signed [31:0] biased_value;
+        begin
+            biased_value = $signed(activation_value * weight_value) + $signed(bias_value);
+            expected_postprocess = biased_value[31] ? '0 : biased_value;
+        end
+    endfunction
 
     task automatic host_read(input ADDR addr, output DATA data);
         @(negedge clock);
@@ -91,6 +104,10 @@ module tpu_system_test ();
         test_weights[1] = 32'd11;
         test_weights[2] = 32'd13;
         test_weights[3] = 32'd17;
+        test_biases[0] = 32'hfffffff0; // -16: exercises ReLU for the first row.
+        test_biases[1] = 32'd1;
+        test_biases[2] = 32'd2;
+        test_biases[3] = 32'd3;
         output_matrix = '{default: '0};
 
         @(negedge clock);
@@ -112,12 +129,19 @@ module tpu_system_test ();
         end
         $display(" ]  (addresses 200 through %0d)", 200 + T - 1);
 
+        for (int i = 0; i < T; i++) begin
+            host_write(16'd250 + i, test_biases[i]);
+        end
+
         cmd.activation_base_addr = 16'd100;
         cmd.weight_base_addr = 16'd200;
+        cmd.bias_base_addr = 16'd250;
         cmd.output_base_addr = 16'd300;
         cmd.m_tiles = 8'd1;
         cmd.n_tiles = 8'd1;
         cmd.k_tiles = 8'd1;
+        cmd.bias_enable = 1'b1;
+        cmd.activation_type = ACT_RELU;
 
         $display("[TPU_SYSTEM] Starting A(column) x B(row) outer product");
         $display("             activation base = 100, weight base = 200, output base = 300");
@@ -146,11 +170,12 @@ module tpu_system_test ();
             $write("             [");
             for (int c = 0; c < T; c++) begin
                 $write(" %0d", output_matrix[r*T + c]);
-                if (output_matrix[r*T + c] !==
-                    test_activations[r] * test_weights[c]) begin
+                if (output_matrix[r*T + c] !== expected_postprocess(
+                    test_activations[r], test_weights[c], test_biases[c])) begin
                     $display("\n[FAIL] output C[%0d][%0d] at address %0d: expected %0d, got %0d",
                              r, c, 300 + (r*T + c),
-                             test_activations[r] * test_weights[c],
+                             expected_postprocess(test_activations[r],
+                                                  test_weights[c], test_biases[c]),
                              output_matrix[r*T + c]);
                     $finish;
                 end

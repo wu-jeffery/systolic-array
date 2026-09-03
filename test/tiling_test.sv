@@ -6,6 +6,7 @@ module tiling_test ();
     localparam ADDR A_BASE = 16'd0;
     localparam ADDR B_BASE = 16'd256;
     localparam ADDR C_BASE = 16'd512;
+    localparam ADDR BIAS_BASE = 16'd800;
 
     logic clock;
     logic reset;
@@ -29,8 +30,10 @@ module tiling_test ();
 
     DATA matrix_a [MAX_MATRIX_SIZE-1:0][MAX_MATRIX_SIZE-1:0];
     DATA matrix_b [MAX_MATRIX_SIZE-1:0][MAX_MATRIX_SIZE-1:0];
+    DATA biases [MAX_MATRIX_SIZE-1:0];
     DATA expected [MAX_MATRIX_SIZE-1:0][MAX_MATRIX_SIZE-1:0];
     DATA observed [MAX_MATRIX_SIZE-1:0][MAX_MATRIX_SIZE-1:0];
+    logic postprocessing_expected;
 
     tpu_system #(
         .T(T),
@@ -54,6 +57,12 @@ module tiling_test ();
     );
 
     always #5 clock = ~clock;
+
+    always @(posedge clock) begin
+        if (!reset && dut.bias_read_req && !postprocessing_expected) begin
+            $fatal(1, "tiling bypass case unexpectedly requested bias data");
+        end
+    end
 
     task automatic host_write(input ADDR addr, input DATA data);
         @(negedge clock);
@@ -103,7 +112,7 @@ module tiling_test ();
         end
     endfunction
 
-    task automatic run_tiling_case(input int matrix_size);
+    task automatic run_tiling_case(input int matrix_size, input logic enable_postprocessing);
         int m_tiles;
         int n_tiles;
         int errors;
@@ -112,8 +121,10 @@ module tiling_test ();
             m_tiles = matrix_size / T;
             n_tiles = matrix_size / T;
 
-            $display("\n[TILING] Starting %0dx%0d matrix multiplication as %0d output tiles",
-                     matrix_size, matrix_size, m_tiles * n_tiles);
+            $display("\n[TILING] Starting %0dx%0d matrix multiplication as %0d output tiles (%s)",
+                     matrix_size, matrix_size, m_tiles * n_tiles,
+                     enable_postprocessing ? "bias + ReLU" : "post-processing bypass");
+            postprocessing_expected = enable_postprocessing;
 
             // Non-symmetric values expose row, column, and tile-order mistakes.
             for (int row = 0; row < matrix_size; row++) begin
@@ -125,11 +136,28 @@ module tiling_test ();
                 end
             end
 
+
+            // Biases are contiguous by output column, so each N tile reads T
+            // adjacent values. Large negative biases exercise ReLU as well as
+            // bias-vector selection across multiple N tiles.
+            for (int col = 0; col < matrix_size; col++) begin
+                biases[col] = (col % 2 == 0) ? -(32'sd1000 + col) : col + 1;
+                if (enable_postprocessing) begin
+                    host_write(BIAS_BASE + col, biases[col]);
+                end
+            end
+
             for (int row = 0; row < matrix_size; row++) begin
                 for (int col = 0; col < matrix_size; col++) begin
                     sum = '0;
                     for (int k = 0; k < matrix_size; k++) begin
                         sum = sum + (matrix_a[row][k] * matrix_b[k][col]);
+                    end
+                    if (enable_postprocessing) begin
+                        sum = sum + biases[col];
+                        if (sum[31]) begin
+                            sum = '0;
+                        end
                     end
                     expected[row][col] = sum;
                 end
@@ -157,11 +185,14 @@ module tiling_test ();
 
             cmd.activation_base_addr = A_BASE;
             cmd.weight_base_addr = B_BASE;
+            cmd.bias_base_addr = BIAS_BASE;
             cmd.output_base_addr = C_BASE;
             cmd.m_tiles = m_tiles;
             cmd.n_tiles = n_tiles;
             // Functional tiling currently processes one scalar K step per run.
             cmd.k_tiles = matrix_size;
+            cmd.bias_enable = enable_postprocessing;
+            cmd.activation_type = enable_postprocessing ? ACT_RELU : ACT_NONE;
 
             @(negedge clock);
             cmd_valid = 1'b1;
@@ -184,6 +215,77 @@ module tiling_test ();
             for (int row = 0; row < matrix_size; row++) begin
                 for (int col = 0; col < matrix_size; col++) begin
                     host_read(c_element_addr(n_tiles, row, col), observed[row][col]);
+                end
+            end
+
+            if (enable_postprocessing) begin
+                $display("\n[TILING] Matrix A:");
+                for (int row = 0; row < matrix_size; row++) begin
+                    $write("  [");
+                    for (int col = 0; col < matrix_size; col++) begin
+                        $write(" %0d", matrix_a[row][col]);
+                    end
+                    $display(" ]");
+                end
+
+                $display("[TILING] Matrix B:");
+                for (int row = 0; row < matrix_size; row++) begin
+                    $write("  [");
+                    for (int col = 0; col < matrix_size; col++) begin
+                        $write(" %0d", matrix_b[row][col]);
+                    end
+                    $display(" ]");
+                end
+
+                $write("[TILING] Column bias = [");
+                for (int col = 0; col < matrix_size; col++) begin
+                    $write(" %0d", biases[col]);
+                end
+                $display(" ]");
+                $display("[TILING] Operation: C = ReLU((A x B) + column_bias)");
+
+                $display("[TILING] Raw A x B:");
+                for (int row = 0; row < matrix_size; row++) begin
+                    $write("  [");
+                    for (int col = 0; col < matrix_size; col++) begin
+                        sum = '0;
+                        for (int k = 0; k < matrix_size; k++) begin
+                            sum = sum + (matrix_a[row][k] * matrix_b[k][col]);
+                        end
+                        $write(" %0d", sum);
+                    end
+                    $display(" ]");
+                end
+
+                $display("[TILING] After bias, before ReLU:");
+                for (int row = 0; row < matrix_size; row++) begin
+                    $write("  [");
+                    for (int col = 0; col < matrix_size; col++) begin
+                        sum = biases[col];
+                        for (int k = 0; k < matrix_size; k++) begin
+                            sum = sum + (matrix_a[row][k] * matrix_b[k][col]);
+                        end
+                        $write(" %0d", sum);
+                    end
+                    $display(" ]");
+                end
+
+                $display("[TILING] Expected C:");
+                for (int row = 0; row < matrix_size; row++) begin
+                    $write("  [");
+                    for (int col = 0; col < matrix_size; col++) begin
+                        $write(" %0d", expected[row][col]);
+                    end
+                    $display(" ]");
+                end
+
+                $display("[TILING] Observed TPU C:");
+                for (int row = 0; row < matrix_size; row++) begin
+                    $write("  [");
+                    for (int col = 0; col < matrix_size; col++) begin
+                        $write(" %0d", observed[row][col]);
+                    end
+                    $display(" ]");
                 end
             end
 
@@ -224,9 +326,12 @@ module tiling_test ();
         @(negedge clock);
         reset = 1'b0;
 
-        run_tiling_case(8);
-        run_tiling_case(12);
-        run_tiling_case(16);
+        postprocessing_expected = 1'b0;
+
+        run_tiling_case(8, 1'b0);
+        run_tiling_case(12, 1'b0);
+        run_tiling_case(16, 1'b0);
+        run_tiling_case(8, 1'b1);
 
         $display("\n[PASS] all functional tiling cases passed");
         $finish;

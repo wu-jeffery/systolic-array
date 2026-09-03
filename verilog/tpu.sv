@@ -16,6 +16,8 @@ module tpu #(
     input logic activations_valid,
     input DATA [T-1:0] weights_in,
     input logic weights_valid,
+    input DATA [T-1:0] bias_in,
+    input logic bias_valid,
 
     input logic fetch_result,
 
@@ -23,6 +25,8 @@ module tpu #(
     output ADDR activation_read_addr,
     output logic weight_read_req,
     output ADDR weight_read_addr,
+    output logic bias_read_req,
+    output ADDR bias_read_addr,
     output logic result_write_req,
     output ADDR result_write_addr,
     output logic [(T*T)-1:0] result_write_mask,
@@ -49,6 +53,14 @@ module tpu #(
     logic queued_cmd_valid;
     logic queued_cmd_ready;
     TPU_CMD queued_cmd;
+    logic postprocess_start;
+    logic postprocess_done;
+    logic bias_enable;
+    ACTIVATION_TYPE activation_type;
+    logic bias_stage_valid;
+    DATA [T-1:0] bias_register;
+    DATA [(T*T)-1:0] biased_results;
+    DATA [(T*T)-1:0] processed_results;
 
     tpu_command_queue cmd_queue (
         .clock        (clock),
@@ -118,6 +130,13 @@ module tpu #(
         .weight_read_req    (weight_read_req),
         .weight_read_addr   (weight_read_addr),
         .weight_read_valid  (weights_valid),
+        .bias_read_req      (bias_read_req),
+        .bias_read_addr     (bias_read_addr),
+        .bias_read_valid    (bias_valid),
+        .postprocess_start  (postprocess_start),
+        .postprocess_done   (postprocess_done),
+        .bias_enable        (bias_enable),
+        .activation_type    (activation_type),
         .result_write_req   (result_write_req),
         .result_write_addr  (result_write_addr),
         .result_write_mask  (result_write_mask),
@@ -128,7 +147,40 @@ module tpu #(
     assign busy = controller_busy || array_scheduler_busy || queued_cmd_valid;
     assign done = controller_done;
     assign accumulators_valid = fetch_result | (|accumulator_valid);
-    assign result_write_data = accumulators;
+    assign result_write_data = processed_results;
+
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            bias_register <= '0;
+        end else if (bias_valid) begin
+            bias_register <= bias_in;
+        end
+    end
+
+    bias_add #(
+        .T(T)
+    ) bias_unit (
+        .clock    (clock),
+        .reset    (reset),
+        .valid_in (postprocess_start),
+        .enable   (bias_enable),
+        .data_in  (accumulators),
+        .bias_in  (bias_register),
+        .valid_out(bias_stage_valid),
+        .data_out (biased_results)
+    );
+
+    activation #(
+        .T(T)
+    ) activation_unit (
+        .clock          (clock),
+        .reset          (reset),
+        .valid_in       (bias_stage_valid),
+        .activation_type(activation_type),
+        .data_in        (biased_results),
+        .valid_out      (postprocess_done),
+        .data_out       (processed_results)
+    );
 
     systolic_array #(
         .T                   (T),

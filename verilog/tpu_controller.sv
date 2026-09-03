@@ -25,6 +25,15 @@ module tpu_controller #(
     output ADDR weight_read_addr,
     input logic weight_read_valid,
 
+    output logic bias_read_req,
+    output ADDR bias_read_addr,
+    input logic bias_read_valid,
+
+    output logic postprocess_start,
+    input logic postprocess_done,
+    output logic bias_enable,
+    output ACTIVATION_TYPE activation_type,
+
     output logic result_write_req,
     output ADDR result_write_addr,
     output logic [(T*T)-1:0] result_write_mask,
@@ -53,8 +62,11 @@ module tpu_controller #(
 
     assign activation_read_addr = active_cmd.activation_base_addr + (activation_tile_index * T);
     assign weight_read_addr = active_cmd.weight_base_addr + (weight_tile_index * T);
+    assign bias_read_addr = active_cmd.bias_base_addr + (current_n_tile * T);
     assign result_write_addr = active_cmd.output_base_addr + (tile_offset * T * T);
     assign result_write_mask = (state == STATE_WRITE) ? {T*T{1'b1}} : '0;
+    assign bias_enable = active_cmd.bias_enable;
+    assign activation_type = active_cmd.activation_type;
 
     always_comb begin
         clear_accumulators = 1'b0;
@@ -63,6 +75,8 @@ module tpu_controller #(
         start_compute = 1'b0;
         activation_read_req = 1'b0;
         weight_read_req = 1'b0;
+        bias_read_req = 1'b0;
+        postprocess_start = 1'b0;
         result_write_req = 1'b0;
 
         case (state)
@@ -76,6 +90,15 @@ module tpu_controller #(
                 load_activations = activation_read_valid && weight_read_valid;
                 load_weights = activation_read_valid && weight_read_valid;
                 start_compute = load_activations && (received_k_steps == '0);
+            end
+
+
+            STATE_BIAS_REQUEST: begin
+                bias_read_req = 1'b1;
+            end
+
+            STATE_POSTPROCESS_START: begin
+                postprocess_start = 1'b1;
             end
 
             STATE_WRITE: begin
@@ -130,6 +153,31 @@ module tpu_controller #(
 
                 STATE_RUN: begin
                     if (array_done) begin
+                        if (active_cmd.bias_enable) begin
+                            state <= STATE_BIAS_REQUEST;
+                        end else begin
+                            state <= STATE_POSTPROCESS_START;
+                        end
+                    end
+                end
+
+
+                STATE_BIAS_REQUEST: begin
+                    state <= STATE_BIAS_WAIT;
+                end
+
+                STATE_BIAS_WAIT: begin
+                    if (bias_read_valid) begin
+                        state <= STATE_POSTPROCESS_START;
+                    end
+                end
+
+                STATE_POSTPROCESS_START: begin
+                    state <= STATE_POSTPROCESS_WAIT;
+                end
+
+                STATE_POSTPROCESS_WAIT: begin
+                    if (postprocess_done) begin
                         state <= STATE_WRITE;
                     end
                 end

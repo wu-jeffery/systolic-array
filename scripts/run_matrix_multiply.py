@@ -18,6 +18,8 @@ SOURCES = [
     "verilog/activation_buffer.sv",
     "verilog/weight_buffer.sv",
     "verilog/input_skew_buffer.sv",
+    "verilog/bias_add.sv",
+    "verilog/activation.sv",
     "verilog/scratchpad.sv",
     "verilog/tpu_command_queue.sv",
     "verilog/array_scheduler.sv",

@@ -37,6 +37,11 @@ module tpu_system #(
     logic weight_read_valid;
     DATA [T-1:0] weight_read_data;
 
+    logic bias_read_req;
+    ADDR bias_read_addr;
+    logic bias_read_valid;
+    DATA [T-1:0] bias_read_data;
+
     logic result_write_req;
     ADDR result_write_addr;
     logic [(T*T)-1:0] result_write_mask;
@@ -69,6 +74,10 @@ module tpu_system #(
         .weight_read_addr     (weight_read_addr),
         .weight_read_valid    (weight_read_valid),
         .weight_read_data     (weight_read_data),
+        .bias_read_req        (bias_read_req),
+        .bias_read_addr       (bias_read_addr),
+        .bias_read_valid      (bias_read_valid),
+        .bias_read_data       (bias_read_data),
         .result_write_req     (result_write_req),
         .result_write_addr    (result_write_addr),
         .result_write_mask    (result_write_mask),
@@ -90,11 +99,15 @@ module tpu_system #(
         .activations_valid (activation_read_valid),
         .weights_in        (weight_read_data),
         .weights_valid     (weight_read_valid),
+        .bias_in           (bias_read_data),
+        .bias_valid        (bias_read_valid),
         .fetch_result      (1'b0),
         .activation_read_req(activation_read_req),
         .activation_read_addr(activation_read_addr),
         .weight_read_req   (weight_read_req),
         .weight_read_addr  (weight_read_addr),
+        .bias_read_req     (bias_read_req),
+        .bias_read_addr    (bias_read_addr),
         .result_write_req  (result_write_req),
         .result_write_addr (result_write_addr),
         .result_write_mask (result_write_mask),

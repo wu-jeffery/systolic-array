@@ -45,6 +45,10 @@ Main modules:
 - `array_scheduler`: cycle-level timer for one streamed systolic-array run. It
   uses the runtime K length and array drain latency to determine when the full
   output tile is ready.
+- `bias_add`: registered post-processing stage that adds one bias per output
+  column, or passes accumulator values through when bias is disabled.
+- `activation`: registered post-processing stage supporting ReLU and a
+  no-activation bypass mode.
 - `scratchpad`: synchronous SRAM-style local memory model with vector reads and
   masked result writes.
 - `tpu`: compute core stitching the command queue, controller, buffers,
@@ -109,16 +113,23 @@ The command descriptor stores:
 
 - `activation_base_addr`: scratchpad base address for A tiles.
 - `weight_base_addr`: scratchpad base address for B tiles.
+- `bias_base_addr`: scratchpad base address for column bias vectors.
 - `output_base_addr`: scratchpad base address for C tiles.
 - `m_tiles`: number of output tile rows.
 - `n_tiles`: number of output tile columns.
 - `k_tiles`: current command-interface name for the number of scalar K steps
   accumulated into each output tile.
+- `bias_enable`: enables the bias read and addition stage.
+- `activation_type`: selects `ACT_NONE` or `ACT_RELU`.
 
 For each output tile `(m_tile, n_tile)`, the controller clears the MAC
 accumulators once. Every scalar K step supplies one A column vector and one B
 row vector, producing an outer product that accumulates into the same output
 tile. Results are written only after all K steps finish.
+
+After a tile completes, the controller optionally reads its bias vector and
+sends the tile through the fixed-latency bias and activation pipeline. Disabled
+operations use registered bypasses, keeping writeback timing uniform.
 
 ### K Streaming
 
@@ -172,6 +183,12 @@ verify the SystemVerilog implementation.
 With `--rtl`, dimensions that do not fill the 4x4 array are automatically
 zero-padded into complete edge tiles. The harness reads back and displays only
 the requested `M x N` result.
+
+The matrix-multiply harness currently configures `bias_enable = 0` and
+`activation_type = ACT_NONE`. Results still cross the registered
+post-processing stages, but both stages operate as unchanged-data bypasses.
+The tiling test covers 8x8, 12x12, and 16x16 bypassed operations and an 8x8
+operation with per-column bias and ReLU enabled across multiple output tiles.
 
 Demo video:
 

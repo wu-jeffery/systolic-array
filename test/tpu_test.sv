@@ -14,10 +14,14 @@ module tpu_test ();
     logic activations_valid;
     DATA [T-1:0] weights_in;
     logic weights_valid;
+    DATA [T-1:0] bias_in;
+    logic bias_valid;
     logic activation_read_req;
     ADDR activation_read_addr;
     logic weight_read_req;
     ADDR weight_read_addr;
+    logic bias_read_req;
+    ADDR bias_read_addr;
     logic result_write_req;
     ADDR result_write_addr;
     logic [(T*T)-1:0] result_write_mask;
@@ -43,11 +47,15 @@ module tpu_test ();
         .activations_valid   (activations_valid),
         .weights_in          (weights_in),
         .weights_valid       (weights_valid),
+        .bias_in             (bias_in),
+        .bias_valid          (bias_valid),
         .fetch_result        (fetch_result),
         .activation_read_req (activation_read_req),
         .activation_read_addr(activation_read_addr),
         .weight_read_req     (weight_read_req),
         .weight_read_addr    (weight_read_addr),
+        .bias_read_req       (bias_read_req),
+        .bias_read_addr      (bias_read_addr),
         .result_write_req    (result_write_req),
         .result_write_addr   (result_write_addr),
         .result_write_mask   (result_write_mask),
@@ -203,8 +211,10 @@ module tpu_test ();
         fetch_result = 1'b0;
         activations_valid = 1'b0;
         weights_valid = 1'b0;
+        bias_valid = 1'b0;
         activations_in = '{default: '0};
         weights_in = '{default: '0};
+        bias_in = '{default: '0};
         cmd = '0;
 
         for (int r = 0; r < T; r++) begin

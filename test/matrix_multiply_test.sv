@@ -61,6 +61,12 @@ module matrix_multiply_test ();
 
     always #5 clock = ~clock;
 
+    always @(posedge clock) begin
+        if (!reset && dut.bias_read_req) begin
+            $fatal(1, "plain matrix multiply unexpectedly requested bias data");
+        end
+    end
+
     task automatic host_write(input ADDR addr, input DATA data);
         @(negedge clock);
         host_write_req = 1'b1;
@@ -127,6 +133,11 @@ module matrix_multiply_test ();
         cmd.m_tiles = M_TILES;
         cmd.n_tiles = N_TILES;
         cmd.k_tiles = K_SIZE;
+        // Plain matrix multiplication uses the registered post-processing
+        // path in bypass mode. No bias read is issued and ReLU is disabled.
+        cmd.bias_base_addr = '0;
+        cmd.bias_enable = 1'b0;
+        cmd.activation_type = ACT_NONE;
 
         @(negedge clock);
         cmd_valid = 1'b1;

@@ -9,16 +9,24 @@
 `define TILE_COUNT_WIDTH 8
 `define CMD_QUEUE_DEPTH 4
 
-typedef logic [31:0] DATA;
+typedef logic signed [31:0] DATA;
 typedef logic [`ADDR_WIDTH-1:0] ADDR;
+
+typedef enum logic [1:0] {
+    ACT_NONE,
+    ACT_RELU
+} ACTIVATION_TYPE;
 
 typedef struct packed {
     ADDR activation_base_addr;
     ADDR weight_base_addr;
+    ADDR bias_base_addr;
     ADDR output_base_addr;
     logic [`TILE_COUNT_WIDTH-1:0] m_tiles;
     logic [`TILE_COUNT_WIDTH-1:0] n_tiles;
     logic [`TILE_COUNT_WIDTH-1:0] k_tiles;
+    logic bias_enable;
+    ACTIVATION_TYPE activation_type;
 } TPU_CMD;
 
 typedef enum logic [3:0] {
@@ -27,6 +35,10 @@ typedef enum logic [3:0] {
     STATE_REQUEST,
     STATE_WAIT_READ,
     STATE_RUN,
+    STATE_BIAS_REQUEST,
+    STATE_BIAS_WAIT,
+    STATE_POSTPROCESS_START,
+    STATE_POSTPROCESS_WAIT,
     STATE_WRITE,
     STATE_ADVANCE
 } STATE;
