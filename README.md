@@ -270,7 +270,7 @@ verilator --version
 
 ```bash
 git clone https://github.com/wu-jeffery/systolic-array.git
-cd systolic-array
+cd systolic-tpu
 ```
 
 If you already cloned the repository, open a terminal and change into its root
