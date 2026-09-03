@@ -1,10 +1,19 @@
 `include "verilog/sys_defs.svh"
+`include "build/matrix_config.svh"
 
 module matrix_multiply_test ();
     localparam int T = `ARRAY_SIZE;
+    localparam int M = `MATRIX_M;
+    localparam int K_SIZE = `MATRIX_K;
+    localparam int N = `MATRIX_N;
+    localparam int PADDED_M = `PADDED_M;
+    localparam int PADDED_N = `PADDED_N;
+    localparam int M_TILES = PADDED_M / T;
+    localparam int N_TILES = PADDED_N / T;
     localparam ADDR A_BASE = 16'd100;
-    localparam ADDR B_BASE = 16'd200;
-    localparam ADDR C_BASE = 16'd300;
+    localparam ADDR B_BASE = A_BASE + (PADDED_M * K_SIZE);
+    localparam ADDR C_BASE = B_BASE + (K_SIZE * PADDED_N);
+    localparam int SCRATCHPAD_DEPTH = C_BASE + (PADDED_M * PADDED_N) + 16;
 
     logic clock;
     logic reset;
@@ -25,12 +34,13 @@ module matrix_multiply_test ();
 
     logic busy;
     logic done;
-    DATA expected [T*T-1:0];
-    DATA observed [T*T-1:0];
+    DATA expected [M*N-1:0];
+    DATA observed [M*N-1:0];
 
     tpu_system #(
         .T(T),
-        .K(T)
+        .K(T),
+        .SCRATCHPAD_DEPTH(SCRATCHPAD_DEPTH)
     ) dut (
         .clock           (clock),
         .reset           (reset),
@@ -74,6 +84,23 @@ module matrix_multiply_test ();
         data = host_read_data;
     endtask
 
+    function automatic ADDR c_element_addr(input int row, input int col);
+        int mt;
+        int nt;
+        int local_row;
+        int local_col;
+        begin
+            mt = row / T;
+            nt = col / T;
+            local_row = row % T;
+            local_col = col % T;
+            c_element_addr = C_BASE
+                           + (((mt * N_TILES) + nt) * T * T)
+                           + (local_row * T)
+                           + local_col;
+        end
+    endfunction
+
     initial begin
         clock = 1'b0;
         reset = 1'b1;
@@ -84,7 +111,7 @@ module matrix_multiply_test ();
         host_write_data = '0;
         host_read_req = 1'b0;
         host_read_addr = '0;
-        for (int i = 0; i < T*T; i++) begin
+        for (int i = 0; i < M*N; i++) begin
             expected[i] = '0;
             observed[i] = '0;
         end
@@ -97,9 +124,9 @@ module matrix_multiply_test ();
         cmd.activation_base_addr = A_BASE;
         cmd.weight_base_addr = B_BASE;
         cmd.output_base_addr = C_BASE;
-        cmd.m_tiles = 8'd1;
-        cmd.n_tiles = 8'd1;
-        cmd.k_tiles = T;
+        cmd.m_tiles = M_TILES;
+        cmd.n_tiles = N_TILES;
+        cmd.k_tiles = K_SIZE;
 
         @(negedge clock);
         cmd_valid = 1'b1;
@@ -115,19 +142,22 @@ module matrix_multiply_test ();
 
         wait (done);
 
-        for (int i = 0; i < T*T; i++) begin
-            host_read(C_BASE + i, observed[i]);
+        for (int row = 0; row < M; row++) begin
+            for (int col = 0; col < N; col++) begin
+                host_read(c_element_addr(row, col), observed[row*N + col]);
+            end
         end
 
         $display("MATRIX_RESULT_BEGIN");
-        for (int r = 0; r < T; r++) begin
-            $display("%0d %0d %0d %0d",
-                     observed[r*T + 0], observed[r*T + 1],
-                     observed[r*T + 2], observed[r*T + 3]);
+        for (int row = 0; row < M; row++) begin
+            for (int col = 0; col < N; col++) begin
+                $write("%0d%s", observed[row*N + col], col + 1 == N ? "" : " ");
+            end
+            $display("");
         end
         $display("MATRIX_RESULT_END");
 
-        for (int i = 0; i < T*T; i++) begin
+        for (int i = 0; i < M*N; i++) begin
             if (observed[i] !== expected[i]) begin
                 $display("[FAIL] C[%0d]=%0d expected=%0d", i, observed[i], expected[i]);
                 $finish;

@@ -142,14 +142,14 @@ with 8x8, 12x12, and 16x16 matrices on the 4x4 array.
 
 ## Demo Harness
 
-Run an interactive 4x4 matrix multiplication with:
+Run an interactive matrix multiplication with:
 
 ```bash
 python3 scripts/run_matrix_multiply.py
 ```
 
-The script prompts for four rows of A and four rows of B, prints `C = A * B`,
-and generates `build/matrix_input.svh`. Matrices can also be supplied directly:
+The script prompts for the `M`, `K`, and `N` dimensions, then for the rows of
+`A[M x K]` and `B[K x N]`. Matrices can also be supplied directly:
 
 ```bash
 python3 scripts/run_matrix_multiply.py \
@@ -168,6 +168,10 @@ python3 scripts/run_matrix_multiply.py --rtl \
 
 Without `--rtl`, the displayed result is calculated by Python and does not
 verify the SystemVerilog implementation.
+
+With `--rtl`, dimensions that do not fill the 4x4 array are automatically
+zero-padded into complete edge tiles. The harness reads back and displays only
+the requested `M x N` result.
 
 Demo video:
 
