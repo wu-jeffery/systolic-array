@@ -1,5 +1,7 @@
 # TPU / Systolic Array Accelerator
 
+[**Try it yourself: set up Verilator and run the demo**](#try-it-yourself)
+
 This project is a SystemVerilog TPU-style accelerator built around a
 systolic array. The goal is to develop the core hardware pieces needed for a
 tiled matrix-multiply engine, then use that engine to run a simple neural
@@ -232,47 +234,103 @@ parallel to match the existing wide scratchpad write interface. A future,
 more SRAM-realistic implementation can place the completed tile in a result
 buffer and drain it through a `T`-lane vector unit one row per cycle.
 
-## Demo Harness
+## Try It Yourself
 
-Run an interactive matrix multiplication with:
+You can multiply matrices using the Python demo alone, or use the free
+Verilator simulator to verify that the SystemVerilog TPU produces the same
+result. No Synopsys license is required for the Verilator flow.
+
+### 1. Install the prerequisites
+
+You need Git, Python 3, and Verilator.
+
+On macOS with [Homebrew](https://brew.sh/):
+
+```bash
+brew install verilator
+```
+
+On Ubuntu or WSL running Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install verilator
+```
+
+Confirm that Python and Verilator are available:
+
+```bash
+python3 --version
+verilator --version
+```
+
+### 2. Download the project
+
+```bash
+git clone https://github.com/wu-jeffery/systolic-array.git
+cd systolic-array
+```
+
+If you already cloned the repository, open a terminal and change into its root
+directory before running the remaining commands.
+
+### 3. Run the interactive demo
+
+Start the beginner-friendly prompt:
 
 ```bash
 python3 scripts/run_matrix_multiply.py
 ```
 
 The script prompts for the `M`, `K`, and `N` dimensions, then for the rows of
-`A[M x K]` and `B[K x N]`. Matrices can also be supplied directly:
+`A[M x K]` and `B[K x N]`. This first command calculates the answer with Python
+and does not require an RTL simulator.
+
+### 4. Run the real RTL simulation
+
+Add `--rtl` and select Verilator to compile the SystemVerilog TPU, run it, and
+compare its output with the expected matrix:
 
 ```bash
-python3 scripts/run_matrix_multiply.py \
-  "1 2 3 4; 5 6 7 8; 9 10 11 12; 13 14 15 16" \
-  "1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1"
+python3 scripts/run_matrix_multiply.py --rtl --sim verilator
 ```
 
-To additionally run `matrix_multiply_test` and verify the result using the TPU
-RTL, add `--rtl`. The harness automatically prefers the free, open-source
-Verilator simulator and falls back to VCS when Verilator is unavailable:
+Enter the dimensions and matrix rows when prompted. A successful run ends with:
 
-```bash
-python3 scripts/run_matrix_multiply.py --rtl \
-  "1 2 3 4; 5 6 7 8; 9 10 11 12; 13 14 15 16" \
-  "1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1"
+```text
+[PASS] matrix multiply matched expected result
 ```
 
-Choose a simulator explicitly with `--sim`:
+You can also supply both matrices directly. Separate entries with spaces and
+rows with semicolons:
 
 ```bash
 python3 scripts/run_matrix_multiply.py --rtl --sim verilator \
-  "1 2; 3 4" "5 6; 7 8"
+  "1 2 3 4; 5 6 7 8; 9 10 11 12" \
+  "1 2 3; 4 5 6; 7 8 9; 10 11 12"
+```
 
+The default `--sim auto` mode prefers Verilator and falls back to VCS if it is
+available, so the shorter command below normally works too:
+
+```bash
+python3 scripts/run_matrix_multiply.py --rtl
+```
+
+Users with access to Synopsys VCS can select it explicitly:
+
+```bash
 python3 scripts/run_matrix_multiply.py --rtl --sim vcs \
   "1 2; 3 4" "5 6; 7 8"
 ```
 
-Verilator does not require a commercial license. Install it with your system
-package manager, then confirm it is available with `verilator --version`. RTL
-runs write their console output to `build/matrix_multiply.out` and waveform to
-`vcd/matrix_multiply.vcd`.
+### 5. Inspect the results
+
+Every RTL run prints the input matrices, expected result, tiling dimensions,
+simulator name, and TPU result. It also creates:
+
+- `build/matrix_multiply.out`: simulation console output.
+- `vcd/matrix_multiply.vcd`: a waveform file for a viewer such as GTKWave.
 
 Without `--rtl`, the displayed result is calculated by Python and does not
 verify the SystemVerilog implementation.
