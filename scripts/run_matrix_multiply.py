@@ -185,13 +185,19 @@ def extract_result(output):
     return rows
 
 
-def ensure_vcs_available():
-    if shutil.which("vcs"):
-        return
+def select_simulator(requested):
+    if requested != "auto":
+        if shutil.which(requested):
+            return requested
+        raise RuntimeError(f"{requested} is not installed or is not on PATH")
+
+    for simulator in ("verilator", "vcs"):
+        if shutil.which(simulator):
+            return simulator
 
     raise RuntimeError(
-        "VCS is not on PATH. Run this on CAEN after loading VCS, e.g. "
-        "`module load vcs/2023.12-SP2-1 verdi/2023.12-SP2-1 synopsys-synth`."
+        "neither Verilator nor VCS is on PATH. Install Verilator for free, or "
+        "load VCS on a machine with a Synopsys license"
     )
 
 
@@ -229,6 +235,43 @@ def run_vcs(repo_root):
     return result.stdout
 
 
+def run_verilator(repo_root):
+    build_dir = repo_root / "build" / "verilator_matrix_multiply"
+    simv = build_dir / "matrix_multiply.simv"
+    out_file = repo_root / "build" / "matrix_multiply.out"
+
+    compile_cmd = [
+        "verilator",
+        "--binary",
+        "--timing",
+        "--trace-vcd",
+        "-Wno-fatal",
+        "--top-module",
+        "matrix_multiply_test",
+        "--Mdir",
+        str(build_dir),
+        "-o",
+        simv.name,
+        "-I.",
+        "-Iverilog",
+        *SOURCES,
+    ]
+    subprocess.run(compile_cmd, cwd=repo_root, check=True)
+
+    run_cmd = [str(simv), "+dumpfile=vcd/matrix_multiply.vcd"]
+    result = subprocess.run(
+        run_cmd,
+        cwd=repo_root,
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    out_file.write_text(result.stdout, encoding="utf-8")
+    print(result.stdout, end="")
+    return result.stdout
+
+
 def main():
     parser = argparse.ArgumentParser(description="Multiply two integer matrices.")
     parser.add_argument("a", nargs="?", help="Matrix A rows separated by semicolons.")
@@ -241,7 +284,13 @@ def main():
     parser.add_argument(
         "--rtl",
         action="store_true",
-        help="Also compile and verify the result using the TPU RTL and VCS.",
+        help="Also compile and verify the result using the TPU RTL.",
+    )
+    parser.add_argument(
+        "--sim",
+        choices=("auto", "verilator", "vcs"),
+        default="auto",
+        help="RTL simulator to use (default: auto, preferring Verilator).",
     )
     args = parser.parse_args()
 
@@ -299,13 +348,17 @@ def main():
     )
 
     try:
-        ensure_vcs_available()
-        output = run_vcs(repo_root)
+        simulator = select_simulator(args.sim)
+        print(f"RTL simulator: {simulator}")
+        if simulator == "verilator":
+            output = run_verilator(repo_root)
+        else:
+            output = run_vcs(repo_root)
     except (RuntimeError, subprocess.CalledProcessError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         print(
             "hint: the matrix result above is still available, but RTL verification "
-            "requires a working VCS license.",
+            "requires Verilator or a working VCS installation/license.",
             file=sys.stderr,
         )
         return 127 if isinstance(exc, RuntimeError) else exc.returncode

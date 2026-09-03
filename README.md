@@ -250,13 +250,29 @@ python3 scripts/run_matrix_multiply.py \
 ```
 
 To additionally run `matrix_multiply_test` and verify the result using the TPU
-RTL, add `--rtl`. This requires VCS and an available license:
+RTL, add `--rtl`. The harness automatically prefers the free, open-source
+Verilator simulator and falls back to VCS when Verilator is unavailable:
 
 ```bash
 python3 scripts/run_matrix_multiply.py --rtl \
   "1 2 3 4; 5 6 7 8; 9 10 11 12; 13 14 15 16" \
   "1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1"
 ```
+
+Choose a simulator explicitly with `--sim`:
+
+```bash
+python3 scripts/run_matrix_multiply.py --rtl --sim verilator \
+  "1 2; 3 4" "5 6; 7 8"
+
+python3 scripts/run_matrix_multiply.py --rtl --sim vcs \
+  "1 2; 3 4" "5 6; 7 8"
+```
+
+Verilator does not require a commercial license. Install it with your system
+package manager, then confirm it is available with `verilator --version`. RTL
+runs write their console output to `build/matrix_multiply.out` and waveform to
+`vcd/matrix_multiply.vcd`.
 
 Without `--rtl`, the displayed result is calculated by Python and does not
 verify the SystemVerilog implementation.
