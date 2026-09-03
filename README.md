@@ -24,6 +24,7 @@ host/software preload port
   -> input skew buffers
   -> systolic array
   -> accumulator/result valid scheduling
+  -> optional bias and activation post-processing
   -> masked result writes back to scratchpad
   -> host/software readback port
 ```
@@ -89,8 +90,9 @@ For one command, the interaction is:
    cycle.
 7. The first valid pair starts the array scheduler.
 8. The scheduler waits for the K stream and final wavefront to drain.
-9. The controller writes the complete output tile back to scratchpad.
-10. The controller advances the N and M tile counters until the command is done.
+9. The tile passes through the bias and activation stages.
+10. The controller writes the complete output tile back to scratchpad.
+11. The controller advances the N and M tile counters until the command is done.
 ```
 
 In short:
@@ -150,6 +152,85 @@ into scratchpad as contiguous activation column vectors and B as contiguous
 weight row vectors. The TPU command then points to those scratchpad regions and
 the controller walks the K steps. The `tiling_test` exercises the same datapath
 with 8x8, 12x12, and 16x16 matrices on the 4x4 array.
+
+## Post-Processing
+
+Neural-network layers commonly perform more than matrix multiplication. For a
+layer with bias and ReLU, this accelerator calculates:
+
+```text
+Y[row][col] = ReLU((A * B)[row][col] + bias[col])
+ReLU(x)      = max(0, x)
+```
+
+Post-processing is kept outside the systolic array so the MAC cells remain
+small and regular. Once an output tile is complete, its values follow this
+path:
+
+```text
+systolic-array accumulators
+  -> registered bias-add or bypass stage
+  -> registered ReLU or bypass stage
+  -> scratchpad writeback
+```
+
+The bias stage receives one `T`-element vector for an output-column tile. Bias
+element `col` is added to that column in every row of the `T x T` result tile.
+For a 4x4 tile, the operation is:
+
+```text
+[c00 c01 c02 c03]   [b0 b1 b2 b3]
+[c10 c11 c12 c13] + [b0 b1 b2 b3]
+[c20 c21 c22 c23]   [b0 b1 b2 b3]
+[c30 c31 c32 c33]   [b0 b1 b2 b3]
+```
+
+Bias vectors are stored contiguously in scratchpad. The controller selects the
+vector for the current output-column tile using:
+
+```text
+bias_read_addr = bias_base_addr + current_n_tile * T
+```
+
+This selects biases 0-3 for column tile 0, biases 4-7 for column tile 1, and so
+on. The same vector is reused when that column tile is computed for another
+output row tile. The current implementation reads the vector again for each
+output tile; caching it across row tiles is a possible later optimization.
+
+The command controls post-processing with:
+
+```systemverilog
+cmd.bias_base_addr = 16'd250;
+cmd.bias_enable = 1'b1;
+cmd.activation_type = ACT_RELU;
+```
+
+Set `bias_enable` to zero to prevent the bias read and bypass addition. Select
+`ACT_NONE` to bypass activation:
+
+```systemverilog
+cmd.bias_enable = 1'b0;
+cmd.activation_type = ACT_NONE;
+```
+
+Both stages are always registered, including during bypass. A valid signal
+travels with the data through each stage, and the controller waits for
+`postprocess_done` before asserting the scratchpad write request. Consequently,
+enabled and bypassed operations have the same pipeline latency, and tile
+counters cannot advance before their result is ready.
+
+ReLU is inexpensive in hardware because two's-complement signed values expose
+their sign in the most-significant bit. Each output only needs a sign-bit check
+and a choice between the original value and zero:
+
+```systemverilog
+relu_out = data_in[31] ? 32'd0 : data_in;
+```
+
+The current post-processing path operates on the complete `T x T` tile in
+parallel to match the existing wide scratchpad write interface. A future,
+more SRAM-realistic implementation can place the completed tile in a result
+buffer and drain it through a `T`-lane vector unit one row per cycle.
 
 ## Demo Harness
 
