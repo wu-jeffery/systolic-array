@@ -1,6 +1,6 @@
 # TPU / Systolic Array Accelerator
 
-[**Try it yourself: set up Verilator and run the demo**](#try-it-yourself)
+[**Try it yourself: set up a simulator and demo the TPU**](#try-it-yourself)
 
 This project is a SystemVerilog TPU-style accelerator built around a
 systolic array. The goal is to develop the core hardware pieces needed for a
@@ -236,9 +236,11 @@ buffer and drain it through a `T`-lane vector unit one row per cycle.
 
 ## Try It Yourself
 
-You can multiply matrices using the Python demo alone, or use the free
-Verilator simulator to verify that the SystemVerilog TPU produces the same
-result. No Synopsys license is required for the Verilator flow.
+This demo lets you send matrices through the TPU interface, see how they are
+divided into tiles for the 4x4 systolic array, and inspect the resulting output.
+The free Verilator flow makes the RTL simulation available without a commercial
+license. University of Michigan engineering students with access to CAEN can
+also use the Synopsys VCS and Verdi tools already supported by the project.
 
 ### 1. Install the prerequisites
 
@@ -274,7 +276,7 @@ cd systolic-array
 If you already cloned the repository, open a terminal and change into its root
 directory before running the remaining commands.
 
-### 3. Run the interactive demo
+### 3. Preview the TPU demo
 
 Start the beginner-friendly prompt:
 
@@ -283,8 +285,8 @@ python3 scripts/run_matrix_multiply.py
 ```
 
 The script prompts for the `M`, `K`, and `N` dimensions, then for the rows of
-`A[M x K]` and `B[K x N]`. This first command calculates the answer with Python
-and does not require an RTL simulator.
+`A[M x K]` and `B[K x N]`. It displays the matrices and expected TPU output so
+you can become familiar with the interface before launching an RTL simulation.
 
 ### 4. Run the real RTL simulation
 
@@ -332,8 +334,8 @@ simulator name, and TPU result. It also creates:
 - `build/matrix_multiply.out`: simulation console output.
 - `vcd/matrix_multiply.vcd`: a waveform file for a viewer such as GTKWave.
 
-Without `--rtl`, the displayed result is calculated by Python and does not
-verify the SystemVerilog implementation.
+Without `--rtl`, the command is only a quick preview of the demo inputs and
+expected output; it does not run or verify the SystemVerilog implementation.
 
 With `--rtl`, dimensions that do not fill the 4x4 array are automatically
 zero-padded into complete edge tiles. The harness reads back and displays only
@@ -344,6 +346,35 @@ The matrix-multiply harness currently configures `bias_enable = 0` and
 post-processing stages, but both stages operate as unchanged-data bypasses.
 The tiling test covers 8x8, 12x12, and 16x16 bypassed operations and an 8x8
 operation with per-column bias and ReLU enabled across multiple output tiles.
+
+### Using Synopsys tools on U-M CAEN
+
+University of Michigan engineering students with CAEN access can use Synopsys
+VCS to run the Makefile-driven testbenches. For example, this command compiles
+and runs the full TPU system testbench:
+
+```bash
+make tpu_system
+```
+
+To run the same testbench and inspect its signals in the Verdi waveform and
+debugging interface, use:
+
+```bash
+make tpu_system.verdi
+```
+
+Replace `tpu_system` with another available test target such as `mac`,
+`systolic_array`, `scratchpad`, `activation`, or `tiling`. For example:
+
+```bash
+make systolic_array
+make systolic_array.verdi
+```
+
+The Makefile loads the required CAEN modules automatically. These commands
+require a U-M CAEN environment and access to the corresponding Synopsys
+licenses; everyone else can use the Verilator demo above.
 
 Demo video:
 
