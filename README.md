@@ -12,6 +12,8 @@ array, then input/output buffering, then command scheduling, scratchpad access,
 and eventually a small software/runtime flow that can issue neural-network
 operations to the hardware.
 
+<img width="320" height="180" alt="TNAB2O" src="https://github.com/user-attachments/assets/f787526e-3546-4f78-90de-8df63b0dea34" />
+
 ## Current Microarchitecture
 
 The current datapath is:
